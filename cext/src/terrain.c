@@ -4,12 +4,12 @@
 #include "../lib/FastNoiseLite.h"
 #include "xorshift.h"
 
-byte get_terrain_at_pixel(int x, int y, byte edge) {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge;
+byte terrain_get_pixel(int x, int y, byte edge_mat) {
+    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge_mat;
     return TERRAIN[y * WIDTH + x];
 }
 
-void set_terrain_at_pixel(int x, int y, byte mat) {
+void terrain_set_pixel(int x, int y, byte mat) {
     if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
     TERRAIN[y * WIDTH + x] = mat;
 }
@@ -29,11 +29,11 @@ static byte terrain_generator_dirt(int x, int y, fnl_state noise, double depth) 
 }
 
 static byte terrain_generator_sand(int x, int y, fnl_state noise, double depth) {
-    byte initial_terrain = get_terrain_at_pixel(x, y, 0x00);
+    byte initial_terrain = terrain_get_pixel(x, y, 0x00);
     if (!initial_terrain) return 0x00;
-    if (!get_terrain_at_pixel(x - 1, y + 1, 0x00) ||
-        !get_terrain_at_pixel(x + 1, y + 1, 0x00) ||
-        !get_terrain_at_pixel(x + 0, y + 1, 0x00))
+    if (!terrain_get_pixel(x - 1, y + 1, 0x00) ||
+        !terrain_get_pixel(x + 1, y + 1, 0x00) ||
+        !terrain_get_pixel(x + 0, y + 1, 0x00))
         return initial_terrain;
 
     double sx          = x;
@@ -80,17 +80,17 @@ int terrain_generate(int base_seed, int smooth_seed) {
 }
 
 void update_sand_at(int x, int y) {
-    if (get_terrain_at_pixel(x, y, 0x00) == 0x02) {
+    if (terrain_get_pixel(x, y, 0x00) == 0x02) {
         //Sand only falls down, so always consider the space above occupied
         byte neighbors = 0b11100000u;
-        if (get_terrain_at_pixel(x - 1, y - 1, 0x00)) neighbors |= 0b10000000u;
-        if (get_terrain_at_pixel(x + 0, y - 1, 0x00)) neighbors |= 0b01000000u;
-        if (get_terrain_at_pixel(x + 1, y - 1, 0x00)) neighbors |= 0b00100000u;
-        if (get_terrain_at_pixel(x - 1, y + 0, 0x00)) neighbors |= 0b00010000u;
-        if (get_terrain_at_pixel(x + 1, y + 0, 0x00)) neighbors |= 0b00001000u;
-        if (get_terrain_at_pixel(x - 1, y + 1, 0x00)) neighbors |= 0b00000100u;
-        if (get_terrain_at_pixel(x + 0, y + 1, 0x00)) neighbors |= 0b00000010u;
-        if (get_terrain_at_pixel(x + 1, y + 1, 0x00)) neighbors |= 0b00000001u;
+        if (terrain_get_pixel(x - 1, y - 1, 0x00)) neighbors |= 0b10000000u;
+        if (terrain_get_pixel(x + 0, y - 1, 0x00)) neighbors |= 0b01000000u;
+        if (terrain_get_pixel(x + 1, y - 1, 0x00)) neighbors |= 0b00100000u;
+        if (terrain_get_pixel(x - 1, y + 0, 0x00)) neighbors |= 0b00010000u;
+        if (terrain_get_pixel(x + 1, y + 0, 0x00)) neighbors |= 0b00001000u;
+        if (terrain_get_pixel(x - 1, y + 1, 0x00)) neighbors |= 0b00000100u;
+        if (terrain_get_pixel(x + 0, y + 1, 0x00)) neighbors |= 0b00000010u;
+        if (terrain_get_pixel(x + 1, y + 1, 0x00)) neighbors |= 0b00000001u;
         byte open_spaces = ~neighbors;
 
         int dx = 0, dy = 0;
@@ -118,8 +118,8 @@ void update_sand_at(int x, int y) {
         }
         if (dx || dy) {
             if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
-            set_terrain_at_pixel(x + dx, y + dy, 0x02);
-            set_terrain_at_pixel(x, y, 0x00);
+            terrain_set_pixel(x + dx, y + dy, 0x02);
+            terrain_set_pixel(x, y, 0x00);
         }
     }
 }
@@ -135,4 +135,14 @@ int terrain_update_sand() {
         }
     }
     return 0;
+}
+
+double terrain_get_pixel_solidness(int x, int y, double edge_val, double dynamic_mod) {
+    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge_val;
+    byte mat = terrain_get_pixel(x, y, 0x00);
+    // Dirt is always solid
+    if(mat == 0x01) return 1.0;
+    // Sand is solid if stable, but less solid if moving.
+    if(mat == 0x02) return 1.0; //TODO: Falling sand should be less solid than static sand.
+    return 0.0;
 }
