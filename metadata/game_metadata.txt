@@ -1,0 +1,6 @@
+devid=canicvs
+devtitle=CANICVS
+gameid=mato
+gametitle=Mato
+version=0.1
+icon=metadata/icon.png
