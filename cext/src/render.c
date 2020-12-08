@@ -5,9 +5,11 @@ int render_terrain() {
 #pragma omp parallel for
     for (int o = 0; o < PIXELS; ++o) {
         switch (TERRAIN[o].type) {
-            case TERRAIN_DIRT_TYPE:SCREEN[o] = (Color) {0xFF004891}; //Dirt
+            case TERRAIN_DIRT_TYPE:SCREEN[o] = (Color) {0xFF004891};
                 break;
-            case TERRAIN_SAND_TYPE:SCREEN[o] = (Color) {0xFF139BAD}; //Sand
+            case TERRAIN_SAND_TYPE:SCREEN[o] = (Color) {0xFF139BAD};
+                break;
+            case TERRAIN_XHST_TYPE:SCREEN[o] = (Color) {0xFFA8A8A8};
                 break;
             default: SCREEN[o] = (Color) {0x00000000};  //Air
         }
@@ -17,11 +19,19 @@ int render_terrain() {
 int render_player(Player *player){
     int ox = (int) player->px;
     int oy = (int) player->py;
-    int so = 0;
+    int sy = 0;
+    int sx;
+    int isx = 0;
+    int dsx = 1;
+    if(player->input.move.horizontal < 0 || (player->input.move.horizontal == 0 && player->vx < 0)){
+        isx = 15;
+        dsx = -1;
+    }
     for (int y = oy; y < 16+oy; ++y) {
+        sx = isx;
         for (int x = ox; x < 16+ox; ++x) {
             if (x < WIDTH && x >= 0 && y >= 0 && y < HEIGHT){
-                Color col = player->sprite[so];
+                Color col = player->sprite[sy*16+sx];
                 if(col.ch.a && (byte)(player->color.a*col.ch.a)){
                     col.ch.r *= player->color.r;
                     col.ch.g *= player->color.g;
@@ -30,8 +40,9 @@ int render_player(Player *player){
                     SCREEN[y*WIDTH+x] = col;
                 }
             }
-            so++;
+            sx+=dsx;
         }
+        sy++;
     }
     return 0;
 }

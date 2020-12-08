@@ -17,31 +17,27 @@
 #include "src/utils.h"
 
 DRB_FFI_NAME(blank_screen)
-int matocore_blank_screen(void) {
+void matocore_blank_screen(void) {
     memset(SCREEN, 0, PIXELS * sizeof(Color));
-    return 0;
 }
 
 DRB_FFI_NAME(draw_terrain)
-int matocore_draw_terrain(void) {
+void matocore_draw_terrain(void) {
     render_terrain();
-    return 0;
 }
 
 DRB_FFI_NAME(generate_terrain)
-int matocore_generate_terrain(int base_seed, int smooth_seed) {
+void matocore_generate_terrain(int base_seed, int smooth_seed) {
     terrain_generate(base_seed, smooth_seed);
-    return 0;
 }
 
-DRB_FFI_NAME(update_sand)
-int matocore_update_sand(void) {
-    terrain_update_sand();
-    return 0;
+DRB_FFI_NAME(update_terrain)
+void matocore_update_terrain(void) {
+    terrain_update();
 }
 
 DRB_FFI_NAME(destroy_terrain)
-int matocore_destroy_terrain(int screen_x, int screen_y, int radius) {
+void matocore_destroy_terrain(int screen_x, int screen_y, int radius) {
     int      mx = screen_x / ZOOM;
     int      my = HEIGHT - (screen_y / ZOOM);
     for (int dy = -radius; dy <= radius; ++dy) {
@@ -53,23 +49,31 @@ int matocore_destroy_terrain(int screen_x, int screen_y, int radius) {
             }
         }
     }
-    return 0;
 }
 
 DRB_FFI_NAME(create_terrain)
-int matocore_create_terrain(int screen_x, int screen_y, int radius) {
+void matocore_create_terrain(int screen_x, int screen_y, int radius, char *material) {
+    TerrainPixel tp = TERRAIN_NONE;
+    if(strcmp(material, "DIRT") == 0){
+        tp = TERRAIN_DIRT;
+    } else if(strcmp(material, "SAND") == 0){
+        tp = TERRAIN_SAND;
+    } else if(strcmp(material, "XHST") == 0){
+        tp = TERRAIN_XHST;
+    } else if(strcmp(material, "SMKE") == 0){
+        tp = TERRAIN_SMKE;
+    }
     int      mx = screen_x / ZOOM;
     int      my = HEIGHT - (screen_y / ZOOM);
     for (int dy = -radius; dy <= radius; ++dy) {
         for (int dx = -radius; dx <= radius; ++dx) {
-            if (terrain_get_pixel(mx + dx, my + dy, TERRAIN_DIRT).type == TERRAIN_NONE.type && sqrt(dx * dx + dy * dy) <= radius) {
+            if (terrain_get_pixel(mx + dx, my + dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE && sqrt(dx * dx + dy * dy) <= radius) {
                 int x = mx + dx;
                 int y = my + dy;
-                terrain_set_pixel(x, y, TERRAIN_SAND);
+                terrain_set_pixel(x, y, tp);
             }
         }
     }
-    return 0;
 }
 
 DRB_FFI_NAME(spawn_player)
@@ -83,33 +87,30 @@ void *matocore_spawn_player(double screen_x, double screen_y, double r, double g
 }
 
 DRB_FFI_NAME(despawn_player)
-int matocore_despawn_player(void *player) {
+void matocore_despawn_player(void *player) {
     Player* cast_player = player;
     player_destroy_player(&cast_player);
-    return 0;
 }
 
 DRB_FFI_NAME(draw_player)
-int matocore_draw_player(void *player) {
-    return render_player((Player*)player);
+void matocore_draw_player(void *player) {
+    render_player((Player*)player);
 }
 
 DRB_FFI_NAME(player_input)
-int matocore_player_input(void *player, double up_down, double left_right) {
+void matocore_player_input(void *player, double up_down, double left_right) {
     player_calc_input((Player*)player, up_down, left_right);
-    return 0;
 }
 
 DRB_FFI_NAME(player_tick)
-int matocore_player_tick(void *player) {
+void matocore_player_tick(void *player) {
     player_do_input((Player*)player);
+    player_do_terrain_edit((Player*)player);
     player_do_movement((Player*)player);
-    return 0;
 }
 
 DRB_FFI_NAME(player_surface_warp)
-int matocore_player_surface_warp(void *player) {
+void matocore_player_surface_warp(void *player) {
     player_do_surface_warp((Player*)player);
-    return 0;
 }
 

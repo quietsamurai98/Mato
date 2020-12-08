@@ -31,13 +31,13 @@ void player_destroy_player(Player **player) {
 }
 
 void player_calc_input(Player *player, double move_vertical, double move_horizontal) {
-    player->input.move.vertical   = fclamp(-move_vertical, -1, 1);
+    player->input.move.vertical   = fclamp(-move_vertical, -1, 0);
     player->input.move.horizontal = fclamp(move_horizontal, -1, 1);
 }
 
 void player_do_input(Player *player) {
-    player->vx += player->input.move.horizontal * 0.5;
-    player->vy += player->input.move.vertical;
+    player->vx += player->input.move.horizontal * 0.25;
+    player->vy += player->input.move.vertical * fclamp(-player->vy, 0.5, 1);
 }
 
 typedef struct {
@@ -177,6 +177,17 @@ void warp_E(Player *player) {
     }
 }
 
+void player_do_terrain_edit(Player *player) {
+    if (player->input.move.vertical < 0) {
+        for (int dy = 13; dy < 16; dy++) {
+            for (int dx = 6; dx < 10; dx += 1) {
+                if (terrain_get_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE)
+                    terrain_set_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_XHST);
+            }
+        }
+    }
+}
+
 void player_do_movement(Player *player) {
     LocalTerrain clipping_terrain = intersecting_terrain(player, 0, 0);
     LocalTerrain local_terrain    = any_terrain(player, 0, 0);
@@ -187,30 +198,35 @@ void player_do_movement(Player *player) {
     player->px += player->vx;
     player->py += player->vy;
     player->vx *= 0.9;
-    player->vy                    = fmax(player->vy, -1);
-    if (!(clipping_terrain.clipped_bits_left & 0b0000111111110000) != !(clipping_terrain.clipped_bits_right & 0b0000111111110000)) {
-        if (clipping_terrain.clipped_bits_left & 0b0000111111110000) {
-            player->vx = fmin(player->vx, 0);
-            warp_E(player);
-            clipping_terrain = intersecting_terrain(player, 0, 0);
-        } else {
-            player->vx = fmax(player->vx, 0);
-            warp_W(player);
-            clipping_terrain = intersecting_terrain(player, 0, 0);
-        }
-    }
-    if(!clipping_terrain.clipped_bits_bottom) player->vy += 0.2;
-    if(!clipping_terrain.clipped_bits_bottom != !clipping_terrain.clipped_bits_top){
+    player->vy                    = fclamp(player->vy, -1, 3.99);
+    if (!clipping_terrain.clipped_bits_bottom) player->vy += 0.2;
+    if (!clipping_terrain.clipped_bits_bottom != !clipping_terrain.clipped_bits_top) {
         if (clipping_terrain.clipped_bits_bottom) {
             player->vy = fmin(player->vy, 0);
             warp_N(player);
+            player->py += 1;
             clipping_terrain = intersecting_terrain(player, 0, 0);
         } else {
             player->vy = fmax(player->vy, 0);
             warp_S(player);
+            player->py -= 1;
             clipping_terrain = intersecting_terrain(player, 0, 0);
         }
     }
+    if (!(clipping_terrain.clipped_bits_left & 0b0000111111110000) != !(clipping_terrain.clipped_bits_right & 0b0000111111110000)) {
+        if (clipping_terrain.clipped_bits_left & 0b0000111111110000) {
+            player->vx = fmin(player->vx, 0);
+            warp_E(player);
+            player->px += 1;
+            clipping_terrain = intersecting_terrain(player, 0, 0);
+        } else {
+            player->vx = fmax(player->vx, 0);
+            warp_W(player);
+            player->py -= 1;
+            clipping_terrain = intersecting_terrain(player, 0, 0);
+        }
+    }
+
 
     /**
      *  2: Update the player's velocity to reflect the terrain at this new position (excluding collision resolution).

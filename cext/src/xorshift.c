@@ -34,11 +34,15 @@ unsigned int xor_srand(unsigned int seed) {
     return xorshift(seed + 1) - 1;
 }
 
-int xor_rand_signed() {
+int xor_rand_int32() {
     unsigned int raw = xorshift(0);
     int out = *(int*)&raw;
     if(out == INT_MAX) return 0;
     return out;
+}
+double xor_rand_double() {
+    unsigned int raw = xorshift(0);
+    return 1.0 - (raw/(double) UINT_MAX);
 }
 
 int rand_sample(const int arr[], const int arr_len) {

@@ -47,6 +47,12 @@ void player_calc_input(Player *player, double move_vertical, double move_horizon
 void player_do_input(Player *player);
 
 /**
+ *
+ * @param player
+ */
+void player_do_terrain_edit(Player *player);
+
+/**
  * If the player is standing in mid-air, they are down-warped so they're standing on the surface immediately below them, and their y velocity is set to 0.
  * If the player is inside the terrain, they are up-warped so they're standing on the surface immediately above them, and their y velocity is set to 0.
  * If the player is standing on a valid surface, this function is essentially a noop (y position and y velocity are unchanged).

@@ -10,10 +10,14 @@
 #define TERRAIN_NONE_TYPE (0x00)
 #define TERRAIN_DIRT_TYPE (0x01)
 #define TERRAIN_SAND_TYPE (0x02)
+#define TERRAIN_XHST_TYPE (0x03)
+#define TERRAIN_SMKE_TYPE (0x04)
 
 #define TERRAIN_NONE ((TerrainPixel){.type=TERRAIN_NONE_TYPE})
 #define TERRAIN_DIRT ((TerrainPixel){.type=TERRAIN_DIRT_TYPE})
 #define TERRAIN_SAND ((TerrainPixel){.type=TERRAIN_SAND_TYPE})
+#define TERRAIN_XHST ((TerrainPixel){.type=TERRAIN_XHST_TYPE})
+#define TERRAIN_SMKE ((TerrainPixel){.type=TERRAIN_SMKE_TYPE})
 
 #endif //ZOOM
 #ifndef CEXT_GLOBALS_H
