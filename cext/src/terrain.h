@@ -5,7 +5,7 @@ int terrain_generate(int base_seed, int smooth_seed);
 
 int terrain_update_sand();
 
-void terrain_set_pixel(int x, int y, byte mat);
+void terrain_set_pixel(int x, int y, TerrainPixel terrain_pixel);
 /**
  * Gets the material of the pixel at the given coordinates
  * @param x Pixel x position
@@ -13,7 +13,7 @@ void terrain_set_pixel(int x, int y, byte mat);
  * @param edge_mat Material to use for out of bounds pixels.
  * @return The material of the pixel
  */
-byte terrain_get_pixel(int x, int y, byte edge_mat);
+TerrainPixel terrain_get_pixel(int x, int y, TerrainPixel edge);
 /**
  * Tests how solid a pixel should be considered for purposes of collision detection with players and projectiles
  * @param x Pixel x position

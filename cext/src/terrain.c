@@ -4,47 +4,57 @@
 #include "../lib/FastNoiseLite.h"
 #include "xorshift.h"
 
-byte terrain_get_pixel(int x, int y, byte edge_mat) {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge_mat;
+TerrainPixel terrain_get_pixel(int x, int y, TerrainPixel edge) {
+    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge;
     return TERRAIN[y * WIDTH + x];
 }
 
-void terrain_set_pixel(int x, int y, byte mat) {
+void terrain_set_pixel(int x, int y, TerrainPixel terrain_pixel) {
     if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
-    TERRAIN[y * WIDTH + x] = mat;
+    TERRAIN[y * WIDTH + x] = terrain_pixel;
 }
 
-static byte terrain_generator_dirt(int x, int y, fnl_state noise, double depth) {
-    if (y == 0) return 0x00;
-    double sx        = x;
-    double sy        = y * 2;
-    double sx_n      = sx / (WIDTH); // sx, normalized to [0..1]
-    double sy_n      = sy / (HEIGHT * 4); // sy, normalized to [0..1]
-    double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
-    threshold = 2 * threshold - 1;
+static TerrainPixel terrain_generator_dirt(int x, int y, fnl_state noise, double depth) {
+    double sx          = x;
+    double sy          = y * 2;
+    double sx_n        = sx / (WIDTH); // sx, normalized to [0..1]
+    double sy_n        = sy / (HEIGHT * 2); // sy, normalized to [0..1]
+    double sy_n2 = sy_n*sy_n;
+    double sy_n3 = sy_n2*sy_n;
+    double sy_n4 = sy_n2*sy_n2;
+    double sy_n5 = sy_n3*sy_n2;
+    double sy_n6 = sy_n3*sy_n3;
+    double sy_n7 = sy_n4*sy_n3;
+    double sy_n8 = sy_n4*sy_n4;
+    double sy_n9 = sy_n5*sy_n4;
+    double sy_n10 = sy_n5*sy_n5;
+//  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
+//  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
+    double threshold = 1.24+-22.7*sy_n+40.4*sy_n2+431*sy_n3+-3619*sy_n4+11792*sy_n5+-18638*sy_n6+14178*sy_n7+-4161*sy_n8;
     double noise_freq  = 1;
     double noise_shift = 0; // Positive => More common blobs. Negative => Less common blobs.
-    if (fnlGetNoise3D(&noise, sx * noise_freq, sy * noise_freq, depth) + noise_shift > threshold) return 0x01;
-    return 0x00;
+    if (fnlGetNoise3D(&noise, sx * noise_freq, sy * noise_freq, depth) + noise_shift > threshold) return TERRAIN_NONE;
+    return TERRAIN_DIRT;
 }
 
-static byte terrain_generator_sand(int x, int y, fnl_state noise, double depth) {
-    byte initial_terrain = terrain_get_pixel(x, y, 0x00);
-    if (!initial_terrain) return 0x00;
-    if (!terrain_get_pixel(x - 1, y + 1, 0x00) ||
-        !terrain_get_pixel(x + 1, y + 1, 0x00) ||
-        !terrain_get_pixel(x + 0, y + 1, 0x00))
-        return initial_terrain;
+static TerrainPixel terrain_generator_sand(int x, int y, fnl_state noise, double depth) {
+    TerrainPixel initial_terrain = terrain_get_pixel(x, y, TERRAIN_NONE);
+    if (initial_terrain.type == TERRAIN_NONE_TYPE || ((
+            terrain_get_pixel(x - 1, y + 1, TERRAIN_NONE).type == TERRAIN_NONE_TYPE ||
+            terrain_get_pixel(x + 1, y + 1, TERRAIN_NONE).type == TERRAIN_NONE_TYPE ||
+            terrain_get_pixel(x + 0, y + 1, TERRAIN_NONE).type == TERRAIN_NONE_TYPE
+    ))) return initial_terrain;
 
     double sx          = x;
     double sy          = y * 2; // Squash the terrain vertically to reduce intensity of slopes
     double sx_n        = sx / WIDTH; // sx, normalized to [0..1]
     double sy_n        = sy / (HEIGHT * 2); // sy, normalized to [0..1]
-    double threshold   = sy_n;
+    //double threshold   = -sy_n;
+    double threshold   = -1.5 * (sy_n-0.3);
     double noise_freq  = 1;
-    double noise_scale = 0.8; // AKA Blob rarity
-    if (fnlGetNoise3D(&noise, noise_freq * sx, noise_freq * sy, depth) * noise_scale > threshold) return 0x02;
-    return initial_terrain;
+    double noise_scale = 1; // AKA Blob rarity
+    if (fnlGetNoise3D(&noise, noise_freq * sx, noise_freq * sy, depth) * noise_scale > threshold) return initial_terrain;
+    return TERRAIN_SAND;
 }
 
 int terrain_generate(int base_seed, int smooth_seed) {
@@ -80,17 +90,18 @@ int terrain_generate(int base_seed, int smooth_seed) {
 }
 
 void update_sand_at(int x, int y) {
-    if (terrain_get_pixel(x, y, 0x00) == 0x02) {
+    TerrainPixel tp = terrain_get_pixel(x, y, TERRAIN_NONE);
+    if (tp.type == TERRAIN_SAND_TYPE) {
         //Sand only falls down, so always consider the space above occupied
         byte neighbors = 0b11100000u;
-        if (terrain_get_pixel(x - 1, y - 1, 0x00)) neighbors |= 0b10000000u;
-        if (terrain_get_pixel(x + 0, y - 1, 0x00)) neighbors |= 0b01000000u;
-        if (terrain_get_pixel(x + 1, y - 1, 0x00)) neighbors |= 0b00100000u;
-        if (terrain_get_pixel(x - 1, y + 0, 0x00)) neighbors |= 0b00010000u;
-        if (terrain_get_pixel(x + 1, y + 0, 0x00)) neighbors |= 0b00001000u;
-        if (terrain_get_pixel(x - 1, y + 1, 0x00)) neighbors |= 0b00000100u;
-        if (terrain_get_pixel(x + 0, y + 1, 0x00)) neighbors |= 0b00000010u;
-        if (terrain_get_pixel(x + 1, y + 1, 0x00)) neighbors |= 0b00000001u;
+        if (terrain_get_pixel(x - 1, y - 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b10000000u;
+        if (terrain_get_pixel(x + 0, y - 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b01000000u;
+        if (terrain_get_pixel(x + 1, y - 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00100000u;
+        if (terrain_get_pixel(x - 1, y + 0, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00010000u;
+        if (terrain_get_pixel(x + 1, y + 0, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00001000u;
+        if (terrain_get_pixel(x - 1, y + 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00000100u;
+        if (terrain_get_pixel(x + 0, y + 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00000010u;
+        if (terrain_get_pixel(x + 1, y + 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00000001u;
         byte open_spaces = ~neighbors;
 
         int dx = 0, dy = 0;
@@ -118,14 +129,15 @@ void update_sand_at(int x, int y) {
         }
         if (dx || dy) {
             if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
-            terrain_set_pixel(x + dx, y + dy, 0x02);
-            terrain_set_pixel(x, y, 0x00);
+            TerrainPixel tmp = terrain_get_pixel(x + dx, y + dy, TERRAIN_NONE);
+            terrain_set_pixel(x + dx, y + dy, tp);
+            terrain_set_pixel(x, y, tmp);
         }
     }
 }
 
 int terrain_update_sand() {
-#pragma omp parallel for
+//#pragma omp parallel for
     //FIXME: Need to move from the bottom up to avoid updating the same particle multiple times.
     // Maybe we should keep track of which particles still need to be updated?
     for (int y = HEIGHT - 1; y >= 0; --y) {
@@ -139,10 +151,10 @@ int terrain_update_sand() {
 
 double terrain_get_pixel_solidness(int x, int y, double edge_val, double dynamic_mod) {
     if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge_val;
-    byte mat = terrain_get_pixel(x, y, 0x00);
+    TerrainPixel tp = terrain_get_pixel(x, y, TERRAIN_NONE);
     // Dirt is always solid
-    if(mat == 0x01) return 1.0;
+    if (tp.type == TERRAIN_DIRT_TYPE) return 1.0;
     // Sand is solid if stable, but less solid if moving.
-    if(mat == 0x02) return 1.0; //TODO: Falling sand should be less solid than static sand.
+    if (tp.type == TERRAIN_SAND_TYPE) return 1.0; //TODO: Falling sand should be less solid than static sand.
     return 0.0;
 }

@@ -33,6 +33,20 @@ Player *player_initialize_player(double x, double y, double r, double g, double 
 void player_destroy_player(Player **player);
 
 /**
+ * Repopulates player->input
+ * @param player The player to take inputs for
+ * @param move_vertical Positive for moving up, negative for moving down.
+ * @param move_horizontal Positive for moving right, negative for moving left.
+ */
+void player_calc_input(Player *player, double move_vertical, double move_horizontal);
+
+/**
+ * Applies user inputs to the given player. Must be called after player_calc_input.
+ * @param player The player to apply inputs to.
+ */
+void player_do_input(Player *player);
+
+/**
  * If the player is standing in mid-air, they are down-warped so they're standing on the surface immediately below them, and their y velocity is set to 0.
  * If the player is inside the terrain, they are up-warped so they're standing on the surface immediately above them, and their y velocity is set to 0.
  * If the player is standing on a valid surface, this function is essentially a noop (y position and y velocity are unchanged).
