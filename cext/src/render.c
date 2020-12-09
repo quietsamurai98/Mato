@@ -11,6 +11,8 @@ int render_terrain() {
                 break;
             case TERRAIN_XHST_TYPE:SCREEN[o] = (Color) {0xFFA8A8A8};
                 break;
+            case TERRAIN_SMKE_TYPE:SCREEN[o] = (Color) {0xFF8A8A8A};
+                break;
             default: SCREEN[o] = (Color) {0x00000000};  //Air
         }
     }

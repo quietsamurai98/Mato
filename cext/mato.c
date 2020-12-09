@@ -118,13 +118,15 @@ DRB_FFI_NAME(player_tick)
 
 void matocore_player_tick(void *player) {
     player_do_input((Player *) player);
-    player_do_terrain_edit((Player *) player);
     player_do_movement((Player *) player);
+    player_do_terrain_edit((Player *) player);
 }
 
 DRB_FFI_NAME(player_surface_warp)
-
 void matocore_player_surface_warp(void *player) {
     player_do_surface_warp((Player *) player);
 }
-
+DRB_FFI_NAME(player_x_pos)
+double matocore_player_x_pos(void *player){
+    return ((Player *) player)->px*ZOOM;
+}

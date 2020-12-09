@@ -91,12 +91,12 @@ void terrain_generate(int base_seed, int smooth_seed) {
 
 int sand_can_occupy(int x, int y) {
     byte mat = terrain_get_pixel(x, y, TERRAIN_NONE).type;
-    return mat == TERRAIN_NONE_TYPE || mat == TERRAIN_XHST_TYPE;
+    return mat == TERRAIN_NONE_TYPE || mat == TERRAIN_XHST_TYPE || mat == TERRAIN_SMKE_TYPE;
 }
 
 void update_sand_at(int x, int y) {
     TerrainPixel tp = terrain_get_pixel(x, y, TERRAIN_NONE);
-    if (tp.type == TERRAIN_SAND_TYPE) {
+    if (tp.type == TERRAIN_SAND_TYPE && !tp.has_moved) {
         byte open_spaces = 0x00;
         if (sand_can_occupy(x - 1, y - 1)) open_spaces |= 0b10000000u;
         if (sand_can_occupy(x + 0, y - 1)) open_spaces |= 0b01000000u;
@@ -134,6 +134,7 @@ void update_sand_at(int x, int y) {
         }
         if (dx || dy) {
             if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
+            tp.has_moved = 0xFF;
             TerrainPixel tmp = terrain_get_pixel(x + dx, y + dy, TERRAIN_NONE);
             terrain_set_pixel(x + dx, y + dy, tp);
             terrain_set_pixel(x, y, tmp);
@@ -153,9 +154,9 @@ void terrain_update_sand() {
     }
 }
 
-void update_gas_at(int x, int y) {
+void update_xhst_at(int x, int y) {
     TerrainPixel tp = terrain_get_pixel(x, y, TERRAIN_NONE);
-    if (tp.type == TERRAIN_XHST_TYPE) {
+    if (tp.type == TERRAIN_XHST_TYPE && !tp.has_moved) {
         //Exhaust falls down, so always consider the space above occupied
         byte neighbors = 0b11100000u;
         if (terrain_get_pixel(x - 1, y - 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b10000000u;
@@ -193,8 +194,94 @@ void update_gas_at(int x, int y) {
         }
         if (dx || dy) {
             if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
+            tp.has_moved = 0xFF;
             TerrainPixel tmp = terrain_get_pixel(x + dx, y + dy, TERRAIN_NONE);
-            if (xor_rand_double() < 0.9) terrain_set_pixel(x + dx, y + dy, tp);
+            if (xor_rand_double() < 0.9) {
+                terrain_set_pixel(x + dx, y + dy, tp);
+            } else if (xor_rand_double() < 0.5) {
+                terrain_set_pixel(x + dx, y + dy, TERRAIN_SMKE);
+
+            }
+            terrain_set_pixel(x, y, tmp);
+        } else {
+            if (!sand_can_occupy(x - 1, y - 1) ||
+                !sand_can_occupy(x + 0, y - 1) ||
+                !sand_can_occupy(x + 1, y - 1) ||
+                !sand_can_occupy(x - 1, y + 0) ||
+                !sand_can_occupy(x + 1, y + 0) ||
+                !sand_can_occupy(x - 1, y + 1) ||
+                !sand_can_occupy(x + 0, y + 1) ||
+                !sand_can_occupy(x + 1, y + 1))
+                terrain_set_pixel(x, y, TERRAIN_NONE);
+        }
+    }
+}
+
+void update_smke_at(int x, int y) {
+    TerrainPixel tp = terrain_get_pixel(x, y, TERRAIN_NONE);
+    if (tp.type == TERRAIN_SMKE_TYPE && !tp.has_moved) {
+        //Smoke rises, so always consider the space below occupied
+        byte neighbors = 0b00000111u;
+        if (terrain_get_pixel(x - 1, y - 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b10000000u;
+        if (terrain_get_pixel(x + 0, y - 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b01000000u;
+        if (terrain_get_pixel(x + 1, y - 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00100000u;
+        if (terrain_get_pixel(x - 1, y + 0, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00010000u;
+        if (terrain_get_pixel(x + 1, y + 0, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00001000u;
+        if (terrain_get_pixel(x - 1, y + 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00000100u;
+        if (terrain_get_pixel(x + 0, y + 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00000010u;
+        if (terrain_get_pixel(x + 1, y + 1, TERRAIN_NONE).type != TERRAIN_NONE_TYPE) neighbors |= 0b00000001u;
+        byte open_spaces = ~neighbors;
+
+        int i = 0;
+
+        if (open_spaces & 0b11111000u) {
+            // @formatter:off
+            switch ((open_spaces & 0b11111000u) >> 3) {
+                case 0b00000: i = rand_sample((const int[]) {0,0,0,0,0,0}, 6); break;
+                case 0b00001: i = rand_sample((const int[]) {0,1,0,0,0,0}, 6); break;
+                case 0b00010: i = rand_sample((const int[]) {0,0,2,0,0,0}, 6); break;
+                case 0b00011: i = rand_sample((const int[]) {0,1,2,0,0,0}, 6); break;
+                case 0b00100: i = rand_sample((const int[]) {0,0,0,3,0,0}, 6); break;
+                case 0b00101: i = rand_sample((const int[]) {0,1,0,3,0,0}, 6); break;
+                case 0b00110: i = rand_sample((const int[]) {0,0,2,3,0,0}, 6); break;
+                case 0b00111: i = rand_sample((const int[]) {0,1,2,3,0,0}, 6); break;
+                case 0b01000: i = rand_sample((const int[]) {0,0,0,0,4,0}, 6); break;
+                case 0b01001: i = rand_sample((const int[]) {0,1,0,0,4,0}, 6); break;
+                case 0b01010: i = rand_sample((const int[]) {0,0,2,0,4,0}, 6); break;
+                case 0b01011: i = rand_sample((const int[]) {0,1,2,0,4,0}, 6); break;
+                case 0b01100: i = rand_sample((const int[]) {0,0,0,3,4,0}, 6); break;
+                case 0b01101: i = rand_sample((const int[]) {0,1,0,3,4,0}, 6); break;
+                case 0b01110: i = rand_sample((const int[]) {0,0,2,3,4,0}, 6); break;
+                case 0b01111: i = rand_sample((const int[]) {0,1,2,3,4,0}, 6); break;
+                case 0b10000: i = rand_sample((const int[]) {0,0,0,0,0,5}, 6); break;
+                case 0b10001: i = rand_sample((const int[]) {0,1,0,0,0,5}, 6); break;
+                case 0b10010: i = rand_sample((const int[]) {0,0,2,0,0,5}, 6); break;
+                case 0b10011: i = rand_sample((const int[]) {0,1,2,0,0,5}, 6); break;
+                case 0b10100: i = rand_sample((const int[]) {0,0,0,3,0,5}, 6); break;
+                case 0b10101: i = rand_sample((const int[]) {0,1,0,3,0,5}, 6); break;
+                case 0b10110: i = rand_sample((const int[]) {0,0,2,3,0,5}, 6); break;
+                case 0b10111: i = rand_sample((const int[]) {0,1,2,3,0,5}, 6); break;
+                case 0b11000: i = rand_sample((const int[]) {0,0,0,0,4,5}, 6); break;
+                case 0b11001: i = rand_sample((const int[]) {0,1,0,0,4,5}, 6); break;
+                case 0b11010: i = rand_sample((const int[]) {0,0,2,0,4,5}, 6); break;
+                case 0b11011: i = rand_sample((const int[]) {0,1,2,0,4,5}, 6); break;
+                case 0b11100: i = rand_sample((const int[]) {0,0,0,3,4,5}, 6); break;
+                case 0b11101: i = rand_sample((const int[]) {0,1,0,3,4,5}, 6); break;
+                case 0b11110: i = rand_sample((const int[]) {0,0,2,3,4,5}, 6); break;
+                case 0b11111: i = rand_sample((const int[]) {0,1,2,3,4,5}, 6); break;
+                default: i = 0;
+            }
+            // @formatter:on
+        }
+        int dx = ((const int[]) {0, 1, -1, 1, 0, -1})[i];
+        int dy = ((const int[]) {0, 0, 0, -1, -1, -1})[i];
+        if (dx || dy) {
+            if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
+            tp.has_moved     = 0xFF;
+            TerrainPixel tmp = terrain_get_pixel(x + dx, y + dy, TERRAIN_NONE);
+            if (xor_rand_double() < 0.99) {
+                terrain_set_pixel(x + dx, y + dy, tp);
+            }
             terrain_set_pixel(x, y, tmp);
         } else {
             if (!sand_can_occupy(x - 1, y - 1) ||
@@ -216,7 +303,8 @@ void terrain_update_gas() {
     // We should *definitely* switch to using a quadtree to reduce the number of pixel tests.
     for (int y = HEIGHT - 1; y >= 0; --y) {
         for (int x = 0; x < WIDTH; ++x) {
-            update_gas_at((x * 2) % WIDTH + (x * 2) / WIDTH, y);
+            update_smke_at((x * 2) % WIDTH + (x * 2) / WIDTH, (y * 2) % HEIGHT + (y * 2) / HEIGHT);
+            update_xhst_at((x * 2) % WIDTH + (x * 2) / WIDTH, (y * 2) % HEIGHT + (y * 2) / HEIGHT);
         }
     }
 }
@@ -227,7 +315,10 @@ double terrain_get_pixel_solidness(int x, int y, double edge_val, double dynamic
     // Dirt is always solid
     if (tp.type == TERRAIN_DIRT_TYPE) return 1.0;
     // Sand is solid if stable, but less solid if moving.
-    if (tp.type == TERRAIN_SAND_TYPE) return 1.0; //TODO: Falling sand should be less solid than static sand.
+    if (tp.type == TERRAIN_SAND_TYPE) {
+        if (tp.has_moved) return 0.0;
+        return 1.0;
+    } //TODO: Falling sand should be less solid than static sand.
     // Exhaust is never solid
     if (tp.type == TERRAIN_XHST_TYPE) return 0.0;
     // Smoke is never solid
@@ -236,6 +327,9 @@ double terrain_get_pixel_solidness(int x, int y, double edge_val, double dynamic
 }
 
 void terrain_update() {
+    for (int o = 0; o < PIXELS; ++o) {
+        TERRAIN[o].has_moved = 0x00;
+    }
     terrain_update_sand();
     terrain_update_gas();
 }

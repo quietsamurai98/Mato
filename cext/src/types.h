@@ -36,5 +36,6 @@ typedef struct {
 
 typedef struct {
     byte type;
+    byte has_moved;
 }               TerrainPixel;
 #endif //CEXT_TYPES_H

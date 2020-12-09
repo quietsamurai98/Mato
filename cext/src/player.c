@@ -53,13 +53,13 @@ static LocalTerrain intersecting_terrain(Player *player, int offset_x, int offse
 
     for (int dy = 0; dy < 16; ++dy) {
         for (int dx = 0; dx < 16; ++dx) {
-            uint32_t mask      = player->collision_mask[dy * 16 + dx].m_color;
-            byte collide_any   = player->collision_mask[dy * 16 + dx].ch.a;
-            byte collide_north = player->collision_mask[dy * 16 + dx].ch.g & 0xF0;
-            byte collide_south = player->collision_mask[dy * 16 + dx].ch.g & 0x0F;
-            byte collide_east  = player->collision_mask[dy * 16 + dx].ch.r & 0xF0;
-            byte collide_west  = player->collision_mask[dy * 16 + dx].ch.r & 0x0F;
-            byte     mat       = terrain_get_pixel(x + dx, y + dy, TERRAIN_DIRT).type; //Treat the edges like walls of indestructible dirt
+            uint32_t mask          = player->collision_mask[dy * 16 + dx].m_color;
+            byte     collide_any   = player->collision_mask[dy * 16 + dx].ch.a;
+            byte     collide_north = player->collision_mask[dy * 16 + dx].ch.g & 0xF0;
+            byte     collide_south = player->collision_mask[dy * 16 + dx].ch.g & 0x0F;
+            byte     collide_east  = player->collision_mask[dy * 16 + dx].ch.r & 0xF0;
+            byte     collide_west  = player->collision_mask[dy * 16 + dx].ch.r & 0x0F;
+            byte     mat           = terrain_get_pixel(x + dx, y + dy, TERRAIN_DIRT).type; //Treat the edges like walls of indestructible dirt
             if (terrain_get_pixel_solidness(x + dx, y + dy, 1, 0.2) >= 1) { //Only collide with solid pixels
                 if (collide_any) {
                     lt.clipped_mats_all[dy][dx] = mat;
@@ -115,6 +115,17 @@ void player_do_terrain_edit(Player *player) {
             }
         }
     }
+    if (player->input.move.horizontal != 0) {
+        LocalTerrain clipping_terrain = intersecting_terrain(player, 0, 2);
+        if (!clipping_terrain.clipped_bits_bottom) {
+            for (int dy = 13; dy < 16; dy++) {
+                for (int dx = 6; dx < 10; dx += 1) {
+                    if (terrain_get_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE)
+                        terrain_set_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_XHST);
+                }
+            }
+        }
+    }
 }
 
 void player_calc_input(Player *player, double move_vertical, double move_horizontal) {
@@ -123,7 +134,12 @@ void player_calc_input(Player *player, double move_vertical, double move_horizon
 }
 
 void player_do_input(Player *player) {
-    player->vx += player->input.move.horizontal * 0.4;
+    LocalTerrain clipping_terrain = intersecting_terrain(player, 0, 1);
+    if (clipping_terrain.clipped_bits_bottom) {
+        player->vx += player->input.move.horizontal * 0.6;
+    } else {
+        player->vx += player->input.move.horizontal * 0.4;
+    }
     player->vy += player->input.move.vertical * 0.4;
 }
 
@@ -131,8 +147,7 @@ void player_do_movement(Player *player) {
     LocalTerrain clipping_terrain = intersecting_terrain(player, 0, 0);
     if (!clipping_terrain.clipped_bits_bottom) player->vy += 0.2;
     /// You got stuck. Now dig.
-    if ((clipping_terrain.clipped_bits_left && clipping_terrain.clipped_bits_right) ||
-        (clipping_terrain.clipped_bits_top && clipping_terrain.clipped_bits_bottom)) {
+    if (clipping_terrain.clipped_bits_left && clipping_terrain.clipped_bits_right && clipping_terrain.clipped_bits_top && clipping_terrain.clipped_bits_bottom) {
         player->vx = 0;
         player->vy = 0;
         return;
@@ -140,35 +155,42 @@ void player_do_movement(Player *player) {
     int      steps    = (int) (fmax(fabs(player->vx), fabs(player->vy)) + 1);
     double   dx       = player->vx / steps;
     double   dy       = player->vy / steps;
+    bool         touching_ground  = false;
     for (int cur_step = 0; cur_step < steps; cur_step++) {
 
         player->px += dx;
         player->py += dy;
         clipping_terrain = intersecting_terrain(player, 0, 0);
+        double bump_px = 0;
+        double bump_vx = 0;
+        double bump_py = 0;
+        double bump_vy = 0;
         if (clipping_terrain.clipped_bits_bottom) {
-            player->py -= 1;
-            player->vy -= 0.5;
-            clipping_terrain = intersecting_terrain(player, 0, 0);
+            bump_py -= 1;
+            bump_vy -= 0.3;
+            touching_ground = true;
         }
         if (clipping_terrain.clipped_bits_top) {
-            player->py += 1;
-            player->vy += 0.5;
-            clipping_terrain = intersecting_terrain(player, 0, 0);
+            bump_py += 1;
+            bump_vy += 0.3;
         }
         if (clipping_terrain.clipped_bits_left) {
-            player->px += 1;
-            player->vx += 0.5;
-            clipping_terrain = intersecting_terrain(player, 0, 0);
+            bump_px += 1;
+            bump_vx += 0.3;
         }
         if (clipping_terrain.clipped_bits_right) {
-            player->px -= 1;
-            player->vx -= 0.5;
-            clipping_terrain = intersecting_terrain(player, 0, 0);
+            bump_px -= 1;
+            bump_vx -= 0.3;
         }
+        player->px += bump_px;
+        player->py += bump_py;
+        player->vx += bump_vx;
+        player->vy += bump_vy;
+
     }
 
     player->vy = fclamp(player->vy, -3.99, 3.99);
-    player->vx *= 0.9;
+    if (touching_ground) { player->vx *= 0.9; } else {player->vx *= 0.95;};
 
 
     /** ORIGINAL PLAN:
