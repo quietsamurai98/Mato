@@ -30,6 +30,7 @@ typedef struct {
     int       hp, hp_max; //Player health data
     int       hp_delta; //A running sum of all the damage taken by the player this tick. Negative values => Healing
     Color     *sprite; //Player sprite
+    Color     *collision_mask; //Collision mask loaded as an image
     UserInput input; //Player input for this tick
 }               Player;
 
