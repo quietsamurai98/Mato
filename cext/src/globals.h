@@ -2,10 +2,12 @@
 #include "types.h"
 
 #ifndef ZOOM
-#define ZOOM 2
-#define HORZ_SCREENS 4
-#define WIDTH ((int)(HORZ_SCREENS*1280/ZOOM))
-#define HEIGHT ((int)(720/ZOOM))
+#define ZOOM (2)
+//#define HORZ_SCREENS 4
+//#define WIDTH ((int)(HORZ_SCREENS*1280/ZOOM))
+//#define HEIGHT ((int)(720/ZOOM))
+#define WIDTH (1024)
+#define HEIGHT (1024)
 #define PIXELS (WIDTH*HEIGHT)
 
 #define TERRAIN_NONE_TYPE (0x00)

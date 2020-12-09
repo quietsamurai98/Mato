@@ -130,3 +130,7 @@ DRB_FFI_NAME(player_x_pos)
 double matocore_player_x_pos(void *player){
     return ((Player *) player)->px*ZOOM;
 }
+DRB_FFI_NAME(player_y_pos)
+double matocore_player_y_pos(void *player){
+    return (HEIGHT-((Player *) player)->py)*ZOOM;
+}

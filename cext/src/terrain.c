@@ -216,7 +216,10 @@ void update_xhst_at(int x, int y) {
         }
     }
 }
-
+int smke_can_occupy(int x, int y) {
+    byte mat = terrain_get_pixel(x, y, TERRAIN_NONE).type;
+    return mat == TERRAIN_NONE_TYPE || mat == TERRAIN_XHST_TYPE;
+}
 void update_smke_at(int x, int y) {
     TerrainPixel tp = terrain_get_pixel(x, y, TERRAIN_NONE);
     if (tp.type == TERRAIN_SMKE_TYPE && !tp.has_moved) {
@@ -284,14 +287,14 @@ void update_smke_at(int x, int y) {
             }
             terrain_set_pixel(x, y, tmp);
         } else {
-            if (!sand_can_occupy(x - 1, y - 1) ||
-                !sand_can_occupy(x + 0, y - 1) ||
-                !sand_can_occupy(x + 1, y - 1) ||
-                !sand_can_occupy(x - 1, y + 0) ||
-                !sand_can_occupy(x + 1, y + 0) ||
-                !sand_can_occupy(x - 1, y + 1) ||
-                !sand_can_occupy(x + 0, y + 1) ||
-                !sand_can_occupy(x + 1, y + 1))
+            if (!smke_can_occupy(x - 1, y - 1) ||
+                !smke_can_occupy(x + 0, y - 1) ||
+                !smke_can_occupy(x + 1, y - 1) ||
+                !smke_can_occupy(x - 1, y + 0) ||
+                !smke_can_occupy(x + 1, y + 0) ||
+                !smke_can_occupy(x - 1, y + 1) ||
+                !smke_can_occupy(x + 0, y + 1) ||
+                !smke_can_occupy(x + 1, y + 1))
                 terrain_set_pixel(x, y, TERRAIN_NONE);
         }
     }
@@ -303,8 +306,8 @@ void terrain_update_gas() {
     // We should *definitely* switch to using a quadtree to reduce the number of pixel tests.
     for (int y = HEIGHT - 1; y >= 0; --y) {
         for (int x = 0; x < WIDTH; ++x) {
-            update_smke_at((x * 2) % WIDTH + (x * 2) / WIDTH, (y * 2) % HEIGHT + (y * 2) / HEIGHT);
-            update_xhst_at((x * 2) % WIDTH + (x * 2) / WIDTH, (y * 2) % HEIGHT + (y * 2) / HEIGHT);
+            update_smke_at((x * 2) % WIDTH + (x * 2) / WIDTH, y);
+            update_xhst_at((x * 2) % WIDTH + (x * 2) / WIDTH, y);
         }
     }
 }
