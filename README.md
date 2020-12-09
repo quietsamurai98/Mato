@@ -1,6 +1,8 @@
 # Mato
 A competitive deathmatch game inspired by [Liero](https://www.liero.be/) and [Noita](https://noitagame.com/)
 
+![demo.gif](demo.gif)
+
 ## What is this?
 This is an in-development game that uses the [DragonRuby Game Toolkit](https://dragonruby.herokuapp.com/toolkit/game).
 
