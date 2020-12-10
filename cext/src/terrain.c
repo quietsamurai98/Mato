@@ -3,22 +3,23 @@
 #include "terrain.h"
 #include "../lib/FastNoiseLite.h"
 #include "xorshift.h"
+#include "utils.h"
 
 TerrainPixel terrain_get_pixel(int x, int y, TerrainPixel edge) {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge;
-    return TERRAIN[y * WIDTH + x];
+    if (x < 0 || y < 0 || x >= TERRAIN_WIDTH || y >= TERRAIN_HEIGHT) return edge;
+    return TERRAIN[y * TERRAIN_WIDTH + x];
 }
 
 void terrain_set_pixel(int x, int y, TerrainPixel terrain_pixel) {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
-    TERRAIN[y * WIDTH + x] = terrain_pixel;
+    if (x < 0 || y < 0 || x >= TERRAIN_WIDTH || y >= TERRAIN_HEIGHT) return;
+    TERRAIN[y * TERRAIN_WIDTH + x] = terrain_pixel;
 }
 
 static TerrainPixel terrain_generator_dirt(int x, int y, fnl_state noise, double depth) {
     double sx          = x;
     double sy          = y * 2;
-    double sx_n        = sx / (WIDTH); // sx, normalized to [0..1]
-    double sy_n        = sy / (HEIGHT * 2); // sy, normalized to [0..1]
+    double sx_n        = sx / (TERRAIN_WIDTH); // sx, normalized to [0..1]
+    double sy_n        = sy / (TERRAIN_HEIGHT * 2); // sy, normalized to [0..1]
     double sy_n2       = sy_n * sy_n;
     double sy_n3       = sy_n2 * sy_n;
     double sy_n4       = sy_n2 * sy_n2;
@@ -30,8 +31,8 @@ static TerrainPixel terrain_generator_dirt(int x, int y, fnl_state noise, double
     double sy_n10      = sy_n5 * sy_n5;
 //  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
 //  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
-    double threshold   = 1.24 + -22.7 * sy_n + 40.4 * sy_n2 + 431 * sy_n3 + -3619 * sy_n4 + 11792 * sy_n5 + -18638 * sy_n6 + 14178 * sy_n7 + -4161 * sy_n8;
-    double noise_freq  = 1;
+    double threshold   = 1.95 + -36.3*sy_n + 54.2*sy_n2 + 1623*sy_n3 + -11269*sy_n4 + 31605*sy_n5 + -44153*sy_n6 + 30401*sy_n7 + -8224*sy_n8;
+    double noise_freq  = 0.6;
     double noise_shift = 0; // Positive => More common blobs. Negative => Less common blobs.
     if (fnlGetNoise3D(&noise, sx * noise_freq, sy * noise_freq, depth) + noise_shift > threshold) return TERRAIN_NONE;
     return TERRAIN_DIRT;
@@ -45,16 +46,28 @@ static TerrainPixel terrain_generator_sand(int x, int y, fnl_state noise, double
             terrain_get_pixel(x + 0, y + 1, TERRAIN_NONE).type == TERRAIN_NONE_TYPE
     )))
         return initial_terrain;
-
     double sx          = x;
-    double sy          = y * 2; // Squash the terrain vertically to reduce intensity of slopes
-    double sx_n        = sx / WIDTH; // sx, normalized to [0..1]
-    double sy_n        = sy / (HEIGHT * 2); // sy, normalized to [0..1]
-    //double threshold   = -sy_n;
-    double threshold   = -1.5 * (sy_n - 0.3);
-    double noise_freq  = 1;
-    double noise_scale = 1; // AKA Blob rarity
-    if (fnlGetNoise3D(&noise, noise_freq * sx, noise_freq * sy, depth) * noise_scale > threshold) return initial_terrain;
+    double sy          = y * 2;
+    double sx_n        = sx / (TERRAIN_WIDTH); // sx, normalized to [0..1]
+    double sy_n        = sy / (TERRAIN_HEIGHT * 2); // sy, normalized to [0..1]
+    double sy_n2       = sy_n * sy_n;
+    double sy_n3       = sy_n2 * sy_n;
+    double sy_n4       = sy_n2 * sy_n2;
+    double sy_n5       = sy_n3 * sy_n2;
+    double sy_n6       = sy_n3 * sy_n3;
+    double sy_n7       = sy_n4 * sy_n3;
+    double sy_n8       = sy_n4 * sy_n4;
+    double sy_n9       = sy_n5 * sy_n4;
+    double sy_n10      = sy_n5 * sy_n5;
+//  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
+//  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
+    double threshold   = -1.02 + 1.68*sy_n + 8.3*sy_n2 + -101*sy_n3 + 129*sy_n4 + 633*sy_n5 + -1891*sy_n6 + 1825*sy_n7 + -605*sy_n8;
+    threshold = (threshold + 1)/2;
+    threshold *=0.25;
+    threshold = threshold*2 - 1;
+    double noise_freq  = 2;
+    double noise_shift = 0; // Positive => More common blobs. Negative => Less common blobs.
+    if (fnlGetNoise3D(&noise, sx * noise_freq, sy * noise_freq, depth) - noise_shift > threshold) return initial_terrain;
     return TERRAIN_SAND;
 }
 
@@ -76,15 +89,15 @@ void terrain_generate(int base_seed, int smooth_seed) {
     sand_noise.frequency    = 0.1f;
     sand_noise.fractal_type = FNL_FRACTAL_NONE;
 
-    memset(TERRAIN, 0, PIXELS * sizeof(byte));
-    for (int y = 0; y < HEIGHT; ++y) {
-        for (int x = 0; x < WIDTH; ++x) {
-            TERRAIN[y * WIDTH + x] = terrain_generator_dirt(x, y, dirt_noise, smooth_seed);
+    memset(TERRAIN, 0, TERRAIN_PIXELS * sizeof(byte));
+    for (int y = 0; y < TERRAIN_HEIGHT; ++y) {
+        for (int x = 0; x < TERRAIN_WIDTH; ++x) {
+            TERRAIN[y * TERRAIN_WIDTH + x] = terrain_generator_dirt(x, y, dirt_noise, smooth_seed);
         }
     }
-    for (int y = HEIGHT - 1; y >= 0; --y) {
-        for (int x = 0; x < WIDTH; ++x) {
-            TERRAIN[y * WIDTH + x] = terrain_generator_sand(x, y, dirt_noise, smooth_seed);
+    for (int y = TERRAIN_HEIGHT - 1; y >= 0; --y) {
+        for (int x = 0; x < TERRAIN_WIDTH; ++x) {
+            TERRAIN[y * TERRAIN_WIDTH + x] = terrain_generator_sand(x, y, dirt_noise, smooth_seed);
         }
     }
 }
@@ -134,22 +147,10 @@ void update_sand_at(int x, int y) {
         }
         if (dx || dy) {
             if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
-            tp.has_moved = 0xFF;
+            tp.has_moved = true;
             TerrainPixel tmp = terrain_get_pixel(x + dx, y + dy, TERRAIN_NONE);
             terrain_set_pixel(x + dx, y + dy, tp);
             terrain_set_pixel(x, y, tmp);
-        }
-    }
-}
-
-void terrain_update_sand() {
-//#pragma omp parallel for
-    //FIXME: Need to move from the bottom up and stagger the columns to avoid updating the same particle multiple times.
-    // Maybe we should keep track of which particles still need to be updated?
-    // We should *definitely* switch to using a quadtree to reduce the number of pixel tests.
-    for (int y = HEIGHT - 1; y >= 0; --y) {
-        for (int x = 0; x < WIDTH; ++x) {
-            update_sand_at((x * 2) % WIDTH + (x * 2) / WIDTH, y);
         }
     }
 }
@@ -194,13 +195,10 @@ void update_xhst_at(int x, int y) {
         }
         if (dx || dy) {
             if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
-            tp.has_moved = 0xFF;
+            tp.has_moved = true;
             TerrainPixel tmp = terrain_get_pixel(x + dx, y + dy, TERRAIN_NONE);
-            if (xor_rand_double() < 0.9) {
+            if (xor_rand_double() < 0.95) {
                 terrain_set_pixel(x + dx, y + dy, tp);
-            } else if (xor_rand_double() < 0.5) {
-                terrain_set_pixel(x + dx, y + dy, TERRAIN_SMKE);
-
             }
             terrain_set_pixel(x, y, tmp);
         } else {
@@ -280,7 +278,7 @@ void update_smke_at(int x, int y) {
         int dy = ((const int[]) {0, 0, 0, -1, -1, -1})[i];
         if (dx || dy) {
             if (dx < -1) dx = -1; else if (dx > 1) dx = 1;
-            tp.has_moved     = 0xFF;
+            tp.has_moved     = true;
             TerrainPixel tmp = terrain_get_pixel(x + dx, y + dy, TERRAIN_NONE);
             if (xor_rand_double() < 0.99) {
                 terrain_set_pixel(x + dx, y + dy, tp);
@@ -299,21 +297,34 @@ void update_smke_at(int x, int y) {
         }
     }
 }
+void terrain_update_bottom_up() {
+    //FIXME: Need to move from the bottom up to make convincing falling sand effect,
+    // and stagger the columns to avoid updating the same particle multiple times.
+    // Maybe we should keep track of which particles still need to be updated?
+    // We should *definitely* switch to using a quadtree to reduce the number of pixel tests.
+#pragma omp parallel for
+    for (int y = TERRAIN_HEIGHT - 1; y >= 0; --y) {
+        for (int x = 0; x < TERRAIN_WIDTH; ++x) {
+            update_sand_at((x * 2) % TERRAIN_WIDTH + (x * 2) / TERRAIN_WIDTH, y);
+            update_xhst_at((x * 2) % TERRAIN_WIDTH + (x * 2) / TERRAIN_WIDTH, y);
+        }
+    }
+}
 
-void terrain_update_gas() {
+void terrain_update_top_down() {
     //FIXME: Need to stagger x and y to avoid updating the same particle multiple times.
     // Maybe we should keep track of which particles still need to be updated?
     // We should *definitely* switch to using a quadtree to reduce the number of pixel tests.
-    for (int y = HEIGHT - 1; y >= 0; --y) {
-        for (int x = 0; x < WIDTH; ++x) {
-            update_smke_at((x * 2) % WIDTH + (x * 2) / WIDTH, y);
-            update_xhst_at((x * 2) % WIDTH + (x * 2) / WIDTH, y);
+#pragma omp parallel for
+    for (int y = 0; y < TERRAIN_HEIGHT; ++y) {
+        for (int x = 0; x < TERRAIN_WIDTH; ++x) {
+            update_smke_at((x * 2) % TERRAIN_WIDTH + (x * 2) / TERRAIN_WIDTH, y);
         }
     }
 }
 
 double terrain_get_pixel_solidness(int x, int y, double edge_val, double dynamic_mod) {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return edge_val;
+    if (x < 0 || y < 0 || x >= TERRAIN_WIDTH || y >= TERRAIN_HEIGHT) return edge_val;
     TerrainPixel tp = terrain_get_pixel(x, y, TERRAIN_NONE);
     // Dirt is always solid
     if (tp.type == TERRAIN_DIRT_TYPE) return 1.0;
@@ -330,9 +341,10 @@ double terrain_get_pixel_solidness(int x, int y, double edge_val, double dynamic
 }
 
 void terrain_update() {
-    for (int o = 0; o < PIXELS; ++o) {
-        TERRAIN[o].has_moved = 0x00;
+#pragma omp parallel for
+    for (int o = 0; o < TERRAIN_PIXELS; ++o) {
+        TERRAIN[o].has_moved = false;
     }
-    terrain_update_sand();
-    terrain_update_gas();
+    terrain_update_bottom_up();
+    terrain_update_top_down();
 }

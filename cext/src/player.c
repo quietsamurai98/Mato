@@ -7,20 +7,18 @@
 #include "utils.h"
 #include "xorshift.h"
 
+#define GRAVITY (0.2)
+
 Player *player_initialize_player(double x, double y, double r, double g, double b) {
     Player *player = calloc(1, sizeof(Player));
     if (!player) return player; //If we can't calloc the player struct for some reason, return early to avoid a segfault.
     *player = (Player) {0};
     player->px             = x;
     player->py             = y;
-    player->vx             = 0;
-    player->vy             = 0;
     player->color          = (DblColor) {r, g, b, 1.0};
     player->hp_max         = 1000;
     player->hp             = player->hp_max;
-    player->hp_delta       = 0;
-    player->w              = 0;
-    player->h              = 0;
+    player->facing         = 1;
     player->sprite         = NULL;
     player->collision_mask = NULL;
     return player;
@@ -99,7 +97,7 @@ void player_do_surface_warp(Player *player) {
         }
     } else if (!lt.clipped_bits_bottom) {
         //Down-warp
-        while (!lt.clipped_bits_bottom && player->py < HEIGHT) {
+        while (!lt.clipped_bits_bottom && player->py < TERRAIN_HEIGHT) {
             player->py += 1;
             lt = intersecting_terrain(player, 0, 0);
         }
@@ -108,92 +106,134 @@ void player_do_surface_warp(Player *player) {
 }
 
 void player_do_terrain_edit(Player *player) {
-    if (player->input.move.vertical < 0) {
-        for (int dy = 13; dy < 16; dy++) {
-            for (int dx = 6; dx < 10; dx += 1) {
-                if (terrain_get_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE) {
-                    if (xor_rand_double() < 0.25) { terrain_set_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_XHST); }
-                }
-            }
-        }
-    }
-    if (player->input.move.horizontal != 0) {
-        LocalTerrain clipping_terrain = intersecting_terrain(player, (player->input.move.horizontal > 0) - (player->input.move.horizontal < 0), 2);
-        if (!clipping_terrain.clipped_bits_bottom) {
-            for (int dy = 13; dy < 16; dy++) {
-                for (int dx = 6; dx < 10; dx += 1) {
-                    if (terrain_get_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE) {
-                        if (xor_rand_double() < 0.25) { terrain_set_pixel((int) player->px + dx, (int) player->py + dy, TERRAIN_XHST); }
-                    }
-                }
-            }
-        }
-    }
+    //TODO: Allow player to dig out terrain natively
 }
 
 void player_calc_input(Player *player, double move_vertical, double move_horizontal) {
-    player->input.move.vertical   = fclamp(-move_vertical, -1, 0);
+    player->input.move.vertical   = -fclamp(move_vertical, 0, 1);
     player->input.move.horizontal = fclamp(move_horizontal, -1, 1);
 }
 
 void player_do_input(Player *player) {
-    LocalTerrain clipping_terrain = intersecting_terrain(player, 0, 1);
+    LocalTerrain clipping_terrain = intersecting_terrain(player, 0, 2);
     if (clipping_terrain.clipped_bits_bottom) {
-        player->vx += player->input.move.horizontal * 0.6;
+        player->physics_data.acc_x += player->input.move.horizontal * 0.06;
     } else {
-        player->vx += player->input.move.horizontal * 0.4;
+        player->physics_data.acc_x += player->input.move.horizontal * 0.04;
     }
-    player->vy += player->input.move.vertical * 0.4;
+    player->physics_data.acc_y += player->input.move.vertical * 0.04;
+
+    player->physics_data.acc_x = fclamp(player->physics_data.acc_x, -1.0, 1.0);
+    player->physics_data.acc_y = fclamp(player->physics_data.acc_y, fmin(-player->physics_data.vel_y, -GRAVITY * 2), 0);
+
+    if (player->input.move.horizontal == 0) {
+        player->physics_data.acc_x = 0;
+    } else {
+        player->facing = (player->input.move.horizontal > 0) - (player->input.move.horizontal < 0);
+    }
+    if (player->input.move.vertical == 0) {
+        player->physics_data.acc_y = 0;
+    }
+
 }
 
 void player_do_movement(Player *player) {
     LocalTerrain clipping_terrain = intersecting_terrain(player, 0, 0);
-    if (!clipping_terrain.clipped_bits_bottom) player->vy += 0.2;
+    if (!clipping_terrain.clipped_bits_bottom) player->physics_data.vel_y += GRAVITY;
     /// You got stuck. Now dig.
     if (clipping_terrain.clipped_bits_left && clipping_terrain.clipped_bits_right && clipping_terrain.clipped_bits_top && clipping_terrain.clipped_bits_bottom) {
-        player->vx = 0;
-        player->vy = 0;
+        player->physics_data.acc_x = 0;
+        player->physics_data.acc_y = 0;
+        player->physics_data.vel_x = 0;
+        player->physics_data.vel_y = 0;
         return;
     }
-    int      steps    = (int) (fmax(fabs(player->vx), fabs(player->vy)) + 1);
-    double   dx       = player->vx / steps;
-    double   dy       = player->vy / steps;
-    bool         touching_ground  = false;
+
+
+    player->physics_data.vel_x += player->physics_data.acc_x;
+    player->physics_data.vel_y += player->physics_data.acc_y;
+    double vx       = player->physics_data.vel_x;
+    double vy       = player->physics_data.vel_y;
+    double ix       = player->px;
+    double iy       = player->py;
+    int    steps    = (int) (fmax(fabs(vx), fabs(vy)) + 1);
+    double dx       = vx / steps;
+    double dy       = vy / steps;
+    int    on_floor = 0;
+
     for (int cur_step = 0; cur_step < steps; cur_step++) {
 
         player->px += dx;
         player->py += dy;
         clipping_terrain = intersecting_terrain(player, 0, 0);
+        LocalTerrain xhst_clipping_terrain = intersecting_terrain(player, 0, 1);
+
+        if (!xhst_clipping_terrain.clipped_bits_bottom && !(player->input.move.vertical == 0 && player->input.move.horizontal == 0)) {
+            int    xhst_n = 12;
+            int    xhst_s = 16;
+            int    xhst_w = 6;
+            int    xhst_e = 10;
+            double prob   = 1.0 / ((xhst_s - xhst_n) * (xhst_e - xhst_w));
+
+            for (int xhst_dy = xhst_n; xhst_dy < xhst_s; xhst_dy++) {
+                for (int xhst_dx = xhst_w; xhst_dx < xhst_e; xhst_dx += 1) {
+                    if (terrain_get_pixel((int) player->px + xhst_dx, (int) player->py + xhst_dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE) {
+                        if (xor_rand_double() < prob) { terrain_set_pixel((int) player->px + xhst_dx, (int) player->py + xhst_dy, TERRAIN_XHST); }
+                    }
+                }
+            }
+        }
+
+        if (clipping_terrain.clipped_bits_left && clipping_terrain.clipped_bits_right && clipping_terrain.clipped_bits_top && clipping_terrain.clipped_bits_bottom) {
+            player->px -= dx;
+            player->py -= dy;
+            continue;
+        }
         double bump_px = 0;
         double bump_vx = 0;
         double bump_py = 0;
         double bump_vy = 0;
         if (clipping_terrain.clipped_bits_bottom) {
             bump_py -= 1;
-            bump_vy -= 0.3;
-            touching_ground = true;
+            bump_vy -= GRAVITY * 1.5;
+            on_floor = true;
         }
         if (clipping_terrain.clipped_bits_top) {
             bump_py += 1;
-            bump_vy += 0.3;
+            bump_vy += GRAVITY * 1.5;
         }
         if (clipping_terrain.clipped_bits_left) {
             bump_px += 1;
-            bump_vx += 0.3;
+            bump_vx += GRAVITY * 1.5;
         }
         if (clipping_terrain.clipped_bits_right) {
             bump_px -= 1;
-            bump_vx -= 0.3;
+            bump_vx -= GRAVITY * 1.5;
         }
         player->px += bump_px;
         player->py += bump_py;
-        player->vx += bump_vx;
-        player->vy += bump_vy;
-
+        player->physics_data.vel_x += bump_vx;
+        player->physics_data.vel_y += bump_vy;
+    }
+    ///Failsafe to prevent getting stuck
+    clipping_terrain = intersecting_terrain(player, 0, 0);
+    if (clipping_terrain.clipped_bits_left && clipping_terrain.clipped_bits_right && clipping_terrain.clipped_bits_top && clipping_terrain.clipped_bits_bottom) {
+        player->px = ix;
+        player->py = iy;
+        return;
     }
 
-//    player->vy = fclamp(player->vy, -3.99, 3.99);
-    if (touching_ground) { player->vx *= 0.9; } else { player->vx *= 0.95; };
+    if (on_floor) {
+        player->physics_data.vel_x *= 0.7;
+    } else {
+        player->physics_data.vel_x *= 0.99;
+    };
+    /// Prevent the player from accelerating to ludicrous speeds, but still allow them to be flung at high speeds
+    if (fabs(player->physics_data.vel_x) > 3.0) {
+        if (signbit(player->physics_data.vel_x) == signbit(player->physics_data.acc_x)) {
+            player->physics_data.vel_x -= player->physics_data.acc_x * 0.9;
+        }
+    }
 
 
     /** ORIGINAL PLAN:

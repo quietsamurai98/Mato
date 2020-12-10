@@ -26,11 +26,9 @@ int screen_to_sprite(const char *name)
             return 1;  // oh well.
         }
     }
-    drb_upload_pixel_array(name, WIDTH, HEIGHT, (const uint32_t *) &SCREEN);
+    drb_upload_pixel_array(name, SCREEN_WIDTH, SCREEN_HEIGHT, (const uint32_t *) &SCREEN);
     return 0;
 }
-#endif
-#ifndef NOT_DRAGONRUBY
 extern void *(*drb_symbol_lookup)(const char *sym);
 #endif
 

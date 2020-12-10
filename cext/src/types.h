@@ -11,20 +11,23 @@ typedef union {
         byte g: 8;
         byte b: 8;
         byte a: 8;
-    }        ch;
-}               Color;
+
+    } ch;
+
+} Color;
 typedef struct {
     double r, g, b, a;
-}               DblColor;
+
+} DblColor;
 typedef struct {
     struct {
         double vertical;
         double horizontal;
     } move;
-}               UserInput;
+
+} UserInput;
 typedef struct {
     double    px, py; //X and Y position (subpixel resolution for smooth velocity support)
-    double    vx, vy; //X and Y velocity
     int       w, h; //Sprite width and height (for collision detection and rendering)
     DblColor  color; //Player's color
     int       hp, hp_max; //Player health data
@@ -32,10 +35,19 @@ typedef struct {
     Color     *sprite; //Player sprite
     Color     *collision_mask; //Collision mask loaded as an image
     UserInput input; //Player input for this tick
-}               Player;
+    struct {
+        double acc_x;
+        double acc_y;
+        double vel_x;
+        double vel_y;
+
+    } physics_data;
+    int facing; //-1 if facing left, 1 if facing right
+
+} Player;
 
 typedef struct {
     byte type;
-    byte has_moved;
-}               TerrainPixel;
+    byte has_moved:1;
+} TerrainPixel;
 #endif //CEXT_TYPES_H
