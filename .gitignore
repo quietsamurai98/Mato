@@ -2,3 +2,4 @@
 /cext/cmake-build-debug/
 /cext/.idea/
 /cext/CMakeLists.txt
+/sprites/*.pdn
