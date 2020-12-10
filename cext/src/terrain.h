@@ -5,7 +5,9 @@ void terrain_generate(int base_seed, int smooth_seed);
 
 void terrain_update();
 
-void terrain_set_pixel(int x, int y, TerrainPixel terrain_pixel);
+void terrain_set_pixel(int x, int y, TerrainPixel terrain_pixel, bool should_update);
+
+TerrainTreeNode *terrain_get_node_at(int x, int y);
 /**
  * Gets the material of the pixel at the given coordinates
  * @param x Pixel x position

@@ -23,6 +23,32 @@ int render_terrain(int x_0, int y_0) {
     }
     return 0;
 }
+int render_terrain_debug(int x_0, int y_0) {
+#pragma omp parallel for collapse(2)
+    for (int y = 0; y < SCREEN_HEIGHT; ++y) {
+        for (int x = 0; x < SCREEN_WIDTH; ++x) {
+            if(terrain_get_pixel(x + x_0, y + y_0, TERRAIN_VOID).type != TERRAIN_VOID_TYPE) {
+                TerrainTreeNode *node = terrain_get_node_at(x + x_0, y + y_0);
+                uint32_t alpha = 0x7F000000;
+                if(node->metadata.need_updating) alpha = 0xFF000000;
+                switch (TERRAIN[node->tp_offset].type) {
+                    case TERRAIN_DIRT_TYPE:SCREEN[y * SCREEN_WIDTH + x] = (Color) {0x001C4E71 | alpha};
+                        break;
+                    case TERRAIN_SAND_TYPE:SCREEN[y * SCREEN_WIDTH + x] = (Color) {0x001097AE | alpha};
+                        break;
+                    case TERRAIN_XHST_TYPE:SCREEN[y * SCREEN_WIDTH + x] = (Color) {0x00A8A8A8 | alpha};
+                        break;
+                    case TERRAIN_SMKE_TYPE:SCREEN[y * SCREEN_WIDTH + x] = (Color) {0x008A8A8A | alpha};
+                        break;
+                    case TERRAIN_VOID_TYPE:SCREEN[y * SCREEN_WIDTH + x] = (Color) {0x00FF00FF | alpha};
+                        break;
+                        default: SCREEN[y * SCREEN_WIDTH + x] = (Color) {alpha == 0xFF000000 ? 0x7FFFFFFF : 0x00000000};  //Air
+                }
+            }
+        }
+    }
+    return 0;
+}
 
 int render_player(Player *player, int x_0, int y_0) {
     int ox  = (int) player->px - x_0;

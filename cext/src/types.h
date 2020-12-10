@@ -2,6 +2,7 @@
 #define CEXT_TYPES_H
 
 #include "stdint.h"
+#include <stdbool.h>
 
 typedef uint8_t byte;
 typedef union {
@@ -41,13 +42,32 @@ typedef struct {
         double vel_x;
         double vel_y;
 
-    } physics_data;
+    }   physics_data;
     int facing; //-1 if facing left, 1 if facing right
 
 } Player;
 
 typedef struct {
     byte type;
-    byte has_moved:1;
+    byte has_moved: 1;
+    byte needs_update: 1;
 } TerrainPixel;
+
+typedef struct TerrainTreeNode {
+    struct {
+        bool need_updating: 1;
+        bool terminal_node: 1;
+        unsigned int parent_on_left: 1;
+        unsigned int parent_on_top: 1;
+    }   metadata;
+    int tp_offset;
+    int tp_x;
+    int tp_y;
+
+    struct TerrainTreeNode *parent;
+    struct TerrainTreeNode *childNW;
+    struct TerrainTreeNode *childNE;
+    struct TerrainTreeNode *childSW;
+    struct TerrainTreeNode *childSE;
+} TerrainTreeNode;
 #endif //CEXT_TYPES_H

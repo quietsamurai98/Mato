@@ -97,7 +97,7 @@ void player_do_surface_warp(Player *player) {
         }
     } else if (!lt.clipped_bits_bottom) {
         //Down-warp
-        while (!lt.clipped_bits_bottom && player->py < TERRAIN_HEIGHT) {
+        while (!lt.clipped_bits_bottom && player->py < TERRAIN_SIZE) {
             player->py += 1;
             lt = intersecting_terrain(player, 0, 0);
         }
@@ -178,7 +178,7 @@ void player_do_movement(Player *player) {
             for (int xhst_dy = xhst_n; xhst_dy < xhst_s; xhst_dy++) {
                 for (int xhst_dx = xhst_w; xhst_dx < xhst_e; xhst_dx += 1) {
                     if (terrain_get_pixel((int) player->px + xhst_dx, (int) player->py + xhst_dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE) {
-                        if (xor_rand_double() < prob) { terrain_set_pixel((int) player->px + xhst_dx, (int) player->py + xhst_dy, TERRAIN_XHST); }
+                        if (xor_rand_double() < prob) { terrain_set_pixel((int) player->px + xhst_dx, (int) player->py + xhst_dy, TERRAIN_XHST, true); }
                     }
                 }
             }
@@ -227,7 +227,7 @@ void player_do_movement(Player *player) {
         player->physics_data.vel_x *= 0.7;
     } else {
         player->physics_data.vel_x *= 0.99;
-    };
+    }
     /// Prevent the player from accelerating to ludicrous speeds, but still allow them to be flung at high speeds
     if (fabs(player->physics_data.vel_x) > 3.0) {
         if (signbit(player->physics_data.vel_x) == signbit(player->physics_data.acc_x)) {

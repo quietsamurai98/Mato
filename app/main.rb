@@ -1,7 +1,7 @@
 $gtk.ffi_misc.gtk_dlopen("ext")
 
-WIDTH  = FFI::MatoCore::terrain_width * FFI::MatoCore::get_zoom
-HEIGHT = FFI::MatoCore::terrain_height * FFI::MatoCore::get_zoom
+WIDTH  = FFI::MatoCore::terrain_size * FFI::MatoCore::get_zoom
+HEIGHT = FFI::MatoCore::terrain_size * FFI::MatoCore::get_zoom
 
 class GTK::Inputs
   def left_right
@@ -21,6 +21,7 @@ end
 
 # @param args [GTK::Args]
 def tick args
+  args ||= $args
   args.state.map_seed       ||= 5
   args.state.map_slice      ||= 0
   args.state.brush_material ||= "NONE"
@@ -39,8 +40,8 @@ def tick args
   args.state.sprite_x ||= FFI::MatoCore::player_x_pos(args.state.player_ptr) - 640
   args.state.sprite_y ||= FFI::MatoCore::player_y_pos(args.state.player_ptr) - 360
 
-  args.state.sprite_x = (args.state.sprite_x * 0.9 + 0.1 * (FFI::MatoCore::player_x_pos(args.state.player_ptr) - 640)).to_i.clamp(0, WIDTH - 1280)
-  args.state.sprite_y = (args.state.sprite_y * 0.9 + 0.1 * (FFI::MatoCore::player_y_pos(args.state.player_ptr) - 360)).to_i.clamp(0, HEIGHT - 720)
+  args.state.sprite_x = (args.state.sprite_x * 0.8 + 0.2 * (FFI::MatoCore::player_x_pos(args.state.player_ptr) - 640)).to_i.clamp(0, WIDTH - 1280)
+  args.state.sprite_y = (args.state.sprite_y * 0.8 + 0.2 * (FFI::MatoCore::player_y_pos(args.state.player_ptr) - 360)).to_i.clamp(0, HEIGHT - 720)
 
   vert_move_ratio      = 0
   horz_move_ratio      = 0.5

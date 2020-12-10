@@ -25,12 +25,12 @@ void matocore_blank_screen(void) {
 
 DRB_FFI_NAME(draw_terrain)
 void matocore_draw_terrain(int x_0, int y_0) {
-    render_terrain(x_0 / ZOOM, TERRAIN_HEIGHT - (y_0 / ZOOM) - SCREEN_HEIGHT);
+    render_terrain(x_0 / ZOOM, TERRAIN_SIZE - (y_0 / ZOOM) - SCREEN_HEIGHT);
 }
 
 DRB_FFI_NAME(draw_player)
 void matocore_draw_player(void *player, int x_0, int y_0) {
-    render_player((Player *) player, x_0 / ZOOM, TERRAIN_HEIGHT - (y_0 / ZOOM) - SCREEN_HEIGHT);
+    render_player((Player *) player, x_0 / ZOOM, TERRAIN_SIZE - (y_0 / ZOOM) - SCREEN_HEIGHT);
 }
 
 DRB_FFI_NAME(generate_terrain)
@@ -46,13 +46,13 @@ void matocore_update_terrain(void) {
 DRB_FFI_NAME(destroy_terrain)
 void matocore_destroy_terrain(int screen_x, int screen_y, int radius) {
     int      mx = screen_x / ZOOM;
-    int      my = TERRAIN_HEIGHT - (screen_y / ZOOM);
+    int      my = TERRAIN_SIZE - (screen_y / ZOOM);
     for (int dy = -radius; dy <= radius; ++dy) {
         for (int dx = -radius; dx <= radius; ++dx) {
             if (sqrt(dx * dx + dy * dy) <= radius) {
                 int x = mx + dx;
                 int y = my + dy;
-                terrain_set_pixel(x, y, TERRAIN_NONE);
+                terrain_set_pixel(x, y, TERRAIN_NONE, true);
             }
         }
     }
@@ -71,13 +71,13 @@ void matocore_create_terrain(int screen_x, int screen_y, int radius, char *mater
         tp = TERRAIN_SMKE;
     }
     int      mx = screen_x / ZOOM;
-    int      my = TERRAIN_HEIGHT - (screen_y / ZOOM);
+    int      my = TERRAIN_SIZE - (screen_y / ZOOM);
     for (int dy = -radius; dy <= radius; ++dy) {
         for (int dx = -radius; dx <= radius; ++dx) {
             if (terrain_get_pixel(mx + dx, my + dy, TERRAIN_DIRT).type == TERRAIN_NONE_TYPE && sqrt(dx * dx + dy * dy) <= radius) {
                 int x = mx + dx;
                 int y = my + dy;
-                terrain_set_pixel(x, y, tp);
+                terrain_set_pixel(x, y, tp, true);
             }
         }
     }
@@ -86,7 +86,7 @@ void matocore_create_terrain(int screen_x, int screen_y, int radius, char *mater
 DRB_FFI_NAME(spawn_player)
 void *matocore_spawn_player(double screen_x, double screen_y, double r, double g, double b) {
     double px      = screen_x / ZOOM;
-    double py      = TERRAIN_HEIGHT - (screen_y / ZOOM);
+    double py      = TERRAIN_SIZE - (screen_y / ZOOM);
     Player *player = player_initialize_player(px, py, fclamp(r, 0, 1), fclamp(g, 0, 1), fclamp(b, 0, 1));
     player->sprite         = load_image("/sprites/player.png", &player->w, &player->h);
     player->collision_mask = load_image("/sprites/player_collision_layers.png", &player->w, &player->h);
@@ -124,7 +124,7 @@ double matocore_player_x_pos(void *player) {
 
 DRB_FFI_NAME(player_y_pos)
 double matocore_player_y_pos(void *player) {
-    return (TERRAIN_HEIGHT - ((Player *) player)->py) * ZOOM;
+    return (TERRAIN_SIZE - ((Player *) player)->py) * ZOOM;
 }
 
 DRB_FFI_NAME(player_x_pos_anchored)
@@ -134,19 +134,14 @@ double matocore_player_x_pos_anchored(void *player, double x_0, double y_0) {
 
 DRB_FFI_NAME(player_y_pos_anchored)
 double matocore_player_y_pos_anchored(void *player, double x_0, double y_0) {
-    double out = TERRAIN_HEIGHT - (y_0 / ZOOM) - SCREEN_HEIGHT;
+    double out = TERRAIN_SIZE - (y_0 / ZOOM) - SCREEN_HEIGHT;
     out = ((Player *) player)->py - out;
     return (SCREEN_HEIGHT - out) * ZOOM;
 }
 
-DRB_FFI_NAME(terrain_width)
-int matocore_terrain_width() {
-    return TERRAIN_WIDTH;
-}
-
-DRB_FFI_NAME(terrain_height)
-int matocore_terrain_height() {
-    return TERRAIN_HEIGHT;
+DRB_FFI_NAME(terrain_size)
+int matocore_level_size() {
+    return TERRAIN_SIZE;
 }
 
 DRB_FFI_NAME(get_zoom)
