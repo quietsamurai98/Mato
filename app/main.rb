@@ -84,7 +84,7 @@ def tick in_args
       (args.state.player_x + Math.cos(mouse_angle) * mouse_dist + args.state.sprite_x).to_i,
       (args.state.player_y + Math.sin(mouse_angle) * mouse_dist + args.state.sprite_y).to_i,
       10
-  ) if args.inputs.mouse.button_right && Kernel.tick_count % 1 == 0
+  ) if args.inputs.mouse.button_right && Kernel.tick_count % 30 == 0
   FFI::MatoCore::create_terrain((args.inputs.mouse.x + args.state.sprite_x).to_i, (args.inputs.mouse.y + args.state.sprite_y).to_i, 10, args.state.brush_material) if args.inputs.mouse.button_left # && args.inputs.mouse.down
 
   FFI::MatoCore::draw_terrain(
