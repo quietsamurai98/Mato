@@ -48,7 +48,7 @@ typedef struct {
 } Player;
 
 typedef struct {
-    byte type;
+    byte type : 6;
     byte has_moved: 1;
     byte needs_update: 1;
 } TerrainPixel;
@@ -64,6 +64,7 @@ typedef struct TerrainTreeNode {
     int tp_x;
     int tp_y;
 
+    int depth;
     struct TerrainTreeNode *parent;
     struct TerrainTreeNode *childNW;
     struct TerrainTreeNode *childNE;

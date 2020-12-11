@@ -37,6 +37,7 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
+                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -54,6 +55,7 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
+                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -71,6 +73,7 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
+                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -88,6 +91,7 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
+                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -101,6 +105,7 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
 }
 
 void destroy_terrain_tree(TerrainTreeNode *node) {
+    if (!node) return;
     if (!node->metadata.terminal_node) {
         destroy_terrain_tree(node->childNW);
         destroy_terrain_tree(node->childNE);
@@ -117,22 +122,118 @@ TerrainTreeNode *terrain_get_node_at(int x, int y) {
     unsigned int    tx    = x;
     unsigned int    ty    = y;
     TerrainTreeNode *node = &terrain_tree_root;
+    TerrainTreeNode *last = NULL;
     for (int        i     = TERRAIN_SPAN - 1; i >= 0; --i) {
         bool left = (tx & 0x1u << i) != 0;
         bool top  = (ty & (0x1u << i)) != 0;
-        if (top) {
-            if (left) {
+        if (!node) {
+            printf("beans");
+            fflush(stdout);
+        }
+        last = node;
+        if (!top) {
+            if (!left) {
+//                printf("SE ");fflush(stdout);
+                if (!node->childSE) {
+                    node->childSE = (TerrainTreeNode *) malloc(sizeof(TerrainTreeNode));
+                    *node->childSE = (TerrainTreeNode) {
+                            .metadata = {
+                                    .need_updating = false,
+                                    .terminal_node = false,
+                                    .parent_on_left = 1,
+                                    .parent_on_top = 1,
+                            },
+                            .tp_offset = -1,
+                            .tp_x = -1,
+                            .tp_y = -1,
+                            .parent = node,
+                            .depth = node->depth + 1,
+                            .childNW = NULL,
+                            .childNE = NULL,
+                            .childSW = NULL,
+                            .childSE = NULL,
+                    };
+                }
                 node = node->childSE;
             } else {
+//                printf("SW ");fflush(stdout);
+                if (!node->childSW) {
+                    node->childSW = (TerrainTreeNode *) malloc(sizeof(TerrainTreeNode));
+                    *node->childSW = (TerrainTreeNode) {
+                            .metadata = {
+                                    .need_updating = false,
+                                    .terminal_node = false,
+                                    .parent_on_left = 0,
+                                    .parent_on_top = 1,
+                            },
+                            .tp_offset = -1,
+                            .tp_x = -1,
+                            .tp_y = -1,
+                            .parent = node,
+                            .depth = node->depth + 1,
+                            .childNW = NULL,
+                            .childNE = NULL,
+                            .childSW = NULL,
+                            .childSE = NULL,
+                    };
+                }
                 node = node->childSW;
             }
         } else {
-            if (left) {
+            if (!left) {
+//                printf("NE ");fflush(stdout);
+                if (!node->childNE) {
+                    node->childNE = (TerrainTreeNode *) malloc(sizeof(TerrainTreeNode));
+                    *node->childNE = (TerrainTreeNode) {
+                            .metadata = {
+                                    .need_updating = false,
+                                    .terminal_node = false,
+                                    .parent_on_left = 1,
+                                    .parent_on_top = 0,
+                            },
+                            .tp_offset = -1,
+                            .tp_x = -1,
+                            .tp_y = -1,
+                            .parent = node,
+                            .depth = node->depth + 1,
+                            .childNW = NULL,
+                            .childNE = NULL,
+                            .childSW = NULL,
+                            .childSE = NULL,
+                    };
+                }
                 node = node->childNE;
             } else {
+//                printf("NW ");fflush(stdout);
+                if (!node->childNW) {
+                    node->childNW = (TerrainTreeNode *) malloc(sizeof(TerrainTreeNode));
+                    *node->childNW = (TerrainTreeNode) {
+                            .metadata = {
+                                    .need_updating = false,
+                                    .terminal_node = false,
+                                    .parent_on_left = 0,
+                                    .parent_on_top = 0,
+                            },
+                            .tp_offset = -1,
+                            .tp_x = -1,
+                            .tp_y = -1,
+                            .parent = node,
+                            .depth = node->depth + 1,
+                            .childNW = NULL,
+                            .childNE = NULL,
+                            .childSW = NULL,
+                            .childSE = NULL,
+                    };
+                }
                 node = node->childNW;
             }
         }
+    }
+    if (node->tp_offset == -1) {
+        node->tp_offset              = y * TERRAIN_SIZE + x;
+        node->tp_x                   = x;
+        node->tp_y                   = y;
+        node->metadata.terminal_node = true;
     }
     return node;
 }
@@ -145,41 +246,59 @@ TerrainPixel terrain_get_pixel(int x, int y, TerrainPixel edge) {
 void terrain_set_pixel(int x, int y, TerrainPixel terrain_pixel, bool should_update) {
     if (x < 0 || y < 0 || x >= TERRAIN_SIZE || y >= TERRAIN_SIZE) return;
     TERRAIN[y * TERRAIN_SIZE + x] = terrain_pixel;
-    if(should_update)
-    for (int tx = x - 1; tx <= x + 1; ++tx) {
-        for (int ty = y - 1; ty <= y + 1; ++ty) {
-            TerrainTreeNode *node = terrain_get_node_at(tx, ty);
-            if (node != NULL) {
-                TerrainPixel *tp = &TERRAIN[node->tp_offset];
-                if (tp->type != TERRAIN_NONE_TYPE && tp->type != TERRAIN_DIRT_TYPE) {
-                    tp->needs_update |= should_update;
-                    node->metadata.need_updating = tp->needs_update;
-                    node = node->parent;
-                    while (node != NULL && !node->metadata.need_updating) {
-                        node->metadata.need_updating = 1;
+    if (should_update)
+        for (int tx               = x - 1; tx <= x + 1; ++tx) {
+            for (int ty = y - 1; ty <= y + 1; ++ty) {
+                TerrainTreeNode *node = terrain_get_node_at(tx, ty);
+                if (node != NULL) {
+                    TerrainPixel *tp = &TERRAIN[node->tp_offset];
+                    if (tp->type != TERRAIN_NONE_TYPE && tp->type != TERRAIN_DIRT_TYPE) {
+                        tp->needs_update |= should_update;
+                        node->metadata.need_updating = tp->needs_update;
                         node = node->parent;
+                        while (node != NULL && !node->metadata.need_updating) {
+                            node->metadata.need_updating = 1;
+                            node = node->parent;
+                        }
                     }
                 }
             }
         }
-    }
 }
 
 void terrain_refresh_quadtree(TerrainTreeNode *node) {
+    if (!node) return;
     if (node->metadata.terminal_node) {
-        TerrainPixel tp = TERRAIN[node->tp_offset];
-        node->metadata.need_updating = tp.needs_update != 0;
-        tp.needs_update              = 0;
+        TerrainPixel *tp = &TERRAIN[node->tp_offset];
+        node->metadata.need_updating = tp->needs_update != 0;
+        tp->has_moved                = false;
+        tp->needs_update             = 0;
     } else {
         if (node->metadata.need_updating) {
             terrain_refresh_quadtree(node->childNW);
             terrain_refresh_quadtree(node->childNE);
             terrain_refresh_quadtree(node->childSW);
             terrain_refresh_quadtree(node->childSE);
-            node->metadata.need_updating = node->childNW->metadata.need_updating ||
-                                           node->childNE->metadata.need_updating ||
-                                           node->childSW->metadata.need_updating ||
-                                           node->childSE->metadata.need_updating;
+            node->metadata.need_updating = (node->childNW && node->childNW->metadata.need_updating) ||
+                                           (node->childNE && node->childNE->metadata.need_updating) ||
+                                           (node->childSW && node->childSW->metadata.need_updating) ||
+                                           (node->childSE && node->childSE->metadata.need_updating);
+        } else if (node->parent) {
+            if (node->metadata.parent_on_top) {
+                if (node->metadata.parent_on_left) {
+                    node->parent->childSE = NULL;
+                } else {
+                    node->parent->childSW = NULL;
+                }
+            } else {
+                if (node->metadata.parent_on_left) {
+                    node->parent->childNE = NULL;
+                } else {
+                    node->parent->childNW = NULL;
+                }
+            }
+            destroy_terrain_tree(node);
+            node = NULL;
         }
     }
 }
@@ -189,21 +308,22 @@ static TerrainPixel terrain_generator_dirt(int x, int y, fnl_state noise, double
     double sy          = y * 2;
     double sx_n        = sx / (TERRAIN_SIZE); // sx, normalized to [0..1]
     double sy_n        = sy / (TERRAIN_SIZE * 2); // sy, normalized to [0..1]
-    double sy_n2       = sy_n * sy_n;
-    double sy_n3       = sy_n2 * sy_n;
-    double sy_n4       = sy_n2 * sy_n2;
-    double sy_n5       = sy_n3 * sy_n2;
-    double sy_n6       = sy_n3 * sy_n3;
-    double sy_n7       = sy_n4 * sy_n3;
-    double sy_n8       = sy_n4 * sy_n4;
-    double sy_n9       = sy_n5 * sy_n4;
-    double sy_n10      = sy_n5 * sy_n5;
-//  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
-//  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
-    double threshold   = 1.95 + -36.3 * sy_n + 54.2 * sy_n2 + 1623 * sy_n3 + -11269 * sy_n4 + 31605 * sy_n5 + -44153 * sy_n6 + 30401 * sy_n7 + -8224 * sy_n8;
-    double noise_freq  = 0.6;
+//    double sy_n2       = sy_n * sy_n;
+//    double sy_n3       = sy_n2 * sy_n;
+//    double sy_n4       = sy_n2 * sy_n2;
+//    double sy_n5       = sy_n3 * sy_n2;
+//    double sy_n6       = sy_n3 * sy_n3;
+//    double sy_n7       = sy_n4 * sy_n3;
+//    double sy_n8       = sy_n4 * sy_n4;
+//    double sy_n9       = sy_n5 * sy_n4;
+//    double sy_n10      = sy_n5 * sy_n5;
+////  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
+////  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
+//    double threshold   = 1.95 + -36.3 * sy_n + 54.2 * sy_n2 + 1623 * sy_n3 + -11269 * sy_n4 + 31605 * sy_n5 + -44153 * sy_n6 + 30401 * sy_n7 + -8224 * sy_n8;
+    double threshold   = fabs(sy_n - 0.5) > 0.45 ? 2 : -0.5;
     double noise_shift = 0; // Positive => More common blobs. Negative => Less common blobs.
-    if (fnlGetNoise3D(&noise, sx * noise_freq, sy * noise_freq, depth) + noise_shift > threshold) return TERRAIN_NONE;
+    threshold += noise_shift;
+    if (threshold <= -1 || fnlGetNoise3D(&noise, sx, sy, depth) > threshold) return TERRAIN_NONE;
     return TERRAIN_DIRT;
     return TERRAIN_SAND;
 }
@@ -216,28 +336,29 @@ static TerrainPixel terrain_generator_sand(int x, int y, fnl_state noise, double
             terrain_get_pixel(x + 0, y + 1, TERRAIN_NONE).type == TERRAIN_NONE_TYPE
     )))
         return initial_terrain;
-    double sx        = x;
-    double sy        = y * 2;
-    double sx_n      = sx / (TERRAIN_SIZE); // sx, normalized to [0..1]
-    double sy_n      = sy / (TERRAIN_SIZE * 2); // sy, normalized to [0..1]
-    double sy_n2     = sy_n * sy_n;
-    double sy_n3     = sy_n2 * sy_n;
-    double sy_n4     = sy_n2 * sy_n2;
-    double sy_n5     = sy_n3 * sy_n2;
-    double sy_n6     = sy_n3 * sy_n3;
-    double sy_n7     = sy_n4 * sy_n3;
-    double sy_n8     = sy_n4 * sy_n4;
-    double sy_n9     = sy_n5 * sy_n4;
-    double sy_n10    = sy_n5 * sy_n5;
-//  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
-//  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
-    double threshold = -1.02 + 1.68 * sy_n + 8.3 * sy_n2 + -101 * sy_n3 + 129 * sy_n4 + 633 * sy_n5 + -1891 * sy_n6 + 1825 * sy_n7 + -605 * sy_n8;
-    threshold = (threshold + 1) / 2;
-    threshold *= 0.25;
-    threshold = threshold * 2 - 1;
-    double noise_freq  = 2;
+    double sx          = x;
+    double sy          = y * 2;
+    double sx_n        = sx / (TERRAIN_SIZE); // sx, normalized to [0..1]
+    double sy_n        = sy / (TERRAIN_SIZE * 2); // sy, normalized to [0..1]
+//    double sy_n2     = sy_n * sy_n;
+//    double sy_n3     = sy_n2 * sy_n;
+//    double sy_n4     = sy_n2 * sy_n2;
+//    double sy_n5     = sy_n3 * sy_n2;
+//    double sy_n6     = sy_n3 * sy_n3;
+//    double sy_n7     = sy_n4 * sy_n3;
+//    double sy_n8     = sy_n4 * sy_n4;
+//    double sy_n9     = sy_n5 * sy_n4;
+//    double sy_n10    = sy_n5 * sy_n5;
+////  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
+////  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
+//    double threshold = -1.02 + 1.68 * sy_n + 8.3 * sy_n2 + -101 * sy_n3 + 129 * sy_n4 + 633 * sy_n5 + -1891 * sy_n6 + 1825 * sy_n7 + -605 * sy_n8;
+//    threshold = (threshold + 1) / 2;
+//    threshold *= 0.5;
+//    threshold = threshold * 2 - 1;
+    double threshold   = -0.75;
     double noise_shift = 0; // Positive => More common blobs. Negative => Less common blobs.
-    if (fnlGetNoise3D(&noise, sx * noise_freq, sy * noise_freq, depth) - noise_shift > threshold) return initial_terrain;
+    threshold -= noise_shift;
+    if (threshold <= -1 || fnlGetNoise3D(&noise, sx, sy, depth) > threshold) return initial_terrain;
     return TERRAIN_SAND;
 }
 
@@ -256,18 +377,19 @@ void terrain_generate(int base_seed, int smooth_seed) {
             .tp_x = -1,
             .tp_y = -1,
             .parent = NULL,
+            .depth = 0,
             .childNW = NULL,
             .childNE = NULL,
             .childSW = NULL,
             .childSE = NULL,
     };
-    initialize_terrain_tree(&terrain_tree_root, 0);
+//    initialize_terrain_tree(&terrain_tree_root, 0);
     fnl_state dirt_noise = fnlCreateState();
     dirt_noise.seed         = base_seed;
     dirt_noise.noise_type   = FNL_NOISE_OPENSIMPLEX2;
     dirt_noise.gain         = 0.5f;
     dirt_noise.octaves      = 1;
-    dirt_noise.frequency    = 0.01f;
+    dirt_noise.frequency    = 0.005f;
     dirt_noise.fractal_type = FNL_FRACTAL_NONE;
     xor_srand(base_seed);
     int       sand_seed  = xor_rand_int32();
@@ -276,7 +398,7 @@ void terrain_generate(int base_seed, int smooth_seed) {
     sand_noise.noise_type   = FNL_NOISE_OPENSIMPLEX2;
     sand_noise.gain         = 0.5f;
     sand_noise.octaves      = 1;
-    sand_noise.frequency    = 0.1f;
+    sand_noise.frequency    = 0.01f;
     sand_noise.fractal_type = FNL_FRACTAL_NONE;
 
     memset(TERRAIN, 0, TERRAIN_PIXELS * sizeof(byte));
@@ -287,7 +409,12 @@ void terrain_generate(int base_seed, int smooth_seed) {
     }
     for (int y = TERRAIN_SIZE - 1; y >= 0; --y) {
         for (int x = 0; x < TERRAIN_SIZE; ++x) {
-            TERRAIN[y * TERRAIN_SIZE + x] = terrain_generator_sand(x, y, dirt_noise, smooth_seed);
+            TerrainPixel tp = terrain_generator_sand(x, y, sand_noise, smooth_seed);
+            if (tp.type == TERRAIN_SAND_TYPE) {
+                terrain_set_pixel(x, y, tp, true);
+            } else {
+                TERRAIN[y * TERRAIN_SIZE + x] = tp;
+            }
         }
     }
 }
@@ -342,7 +469,7 @@ void update_sand_at(int x, int y) {
             terrain_set_pixel(x + dx, y + dy, tp, true);
             terrain_set_pixel(x, y, tmp, true);
         } else {
-            tp.has_moved = false;
+            tp.has_moved    = false;
             tp.needs_update = false;
             terrain_set_pixel(x, y, tp, false);
         }
@@ -508,12 +635,13 @@ void terrain_update_bottom_up() {
 }
 
 void terrain_update_quadtree_bottom_up(TerrainTreeNode *node) {
+    if (!node) return;
     if (node->metadata.need_updating) {
         if (node->metadata.terminal_node) {
             update_sand_at(node->tp_x, node->tp_y);
             update_xhst_at(node->tp_x, node->tp_y);
         } else {
-            if(xor_rand_double()<0.5){
+            if (xor_rand_double() < 0.5) {
                 terrain_update_quadtree_bottom_up(node->childSW);
                 terrain_update_quadtree_bottom_up(node->childSE);
                 terrain_update_quadtree_bottom_up(node->childNW);
@@ -529,11 +657,12 @@ void terrain_update_quadtree_bottom_up(TerrainTreeNode *node) {
 }
 
 void terrain_update_quadtree_top_down(TerrainTreeNode *node) {
+    if (!node) return;
     if (node->metadata.need_updating) {
         if (node->metadata.terminal_node) {
             update_smke_at(node->tp_x, node->tp_y);
         } else {
-            if(xor_rand_double()<0.5){
+            if (xor_rand_double() < 0.5) {
                 terrain_update_quadtree_bottom_up(node->childNW);
                 terrain_update_quadtree_bottom_up(node->childNE);
                 terrain_update_quadtree_bottom_up(node->childSW);
@@ -578,10 +707,10 @@ double terrain_get_pixel_solidness(int x, int y, double edge_val, double dynamic
 }
 
 void terrain_update() {
-#pragma omp parallel for
-    for (int o = 0; o < TERRAIN_PIXELS; ++o) {
-        TERRAIN[o].has_moved = false;
-    }
+//#pragma omp parallel for
+//    for (int o = 0; o < TERRAIN_PIXELS; ++o) {
+//        TERRAIN[o].has_moved = false;
+//    }
 //    terrain_update_bottom_up();
 //    terrain_update_top_down();
     terrain_refresh_quadtree(&terrain_tree_root);

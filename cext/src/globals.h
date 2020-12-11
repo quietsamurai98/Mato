@@ -3,7 +3,7 @@
 
 #ifndef ZOOM
 #define ZOOM (2)
-#define TERRAIN_SPAN (12)
+#define TERRAIN_SPAN (13)
 #define TERRAIN_SIZE (0x1<<TERRAIN_SPAN)
 #define TERRAIN_PIXELS (TERRAIN_SIZE*TERRAIN_SIZE)
 #define SCREEN_WIDTH (int)(1280/ZOOM)

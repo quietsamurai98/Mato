@@ -226,10 +226,10 @@ void player_do_movement(Player *player) {
     if (on_floor) {
         player->physics_data.vel_x *= 0.7;
     } else {
-        player->physics_data.vel_x *= 0.99;
+        player->physics_data.vel_x *= 0.999;
     }
     /// Prevent the player from accelerating to ludicrous speeds, but still allow them to be flung at high speeds
-    if (fabs(player->physics_data.vel_x) > 3.0) {
+    if (fabs(player->physics_data.vel_x) > 4.0) {
         if (signbit(player->physics_data.vel_x) == signbit(player->physics_data.acc_x)) {
             player->physics_data.vel_x -= player->physics_data.acc_x * 0.9;
         }
