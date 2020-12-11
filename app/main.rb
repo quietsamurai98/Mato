@@ -22,20 +22,19 @@ end
 # @param args [GTK::Args]
 def tick in_args
   args                      = in_args || $args
-  args.state.map_seed       ||= 5
-  args.state.map_slice      ||= 0
+  args.state.map_seed       ||= 6
   args.state.brush_material ||= "NONE"
   args.state.vert_move      ||= 0
   args.state.horz_move      ||= 0
   args.state.do_terrain_gen ||= false
-  args.state.timer ||= Time.now
+  args.state.timer          ||= Kernel.tick_count
   if args.state.do_terrain_gen
-    FFI::MatoCore::generate_terrain(args.state.map_seed.to_i, args.state.map_slice.to_i)
-    args.state.map_slice      += 1
+    FFI::MatoCore::generate_terrain(args.state.map_seed.to_i)
+    args.state.map_seed       += 1
     args.state.do_terrain_gen = false
   end
   if Kernel.tick_count == 0 || args.inputs.keyboard.t || in_args == false
-    args.outputs.labels << [640, 360, "LOADING", 10, 1]
+    args.outputs.labels << [640, 370, "LOADING", 10, 1]
     args.state.do_terrain_gen = true
     return
   else
@@ -51,8 +50,8 @@ def tick in_args
     args.state.sprite_y   = nil
     args.state.has_moved  = false
   end
-  args.state.sprite_x  ||= FFI::MatoCore::player_x_pos(args.state.player_ptr) - 640
-  args.state.sprite_y  ||= FFI::MatoCore::player_y_pos(args.state.player_ptr) - 360
+  args.state.sprite_x ||= FFI::MatoCore::player_x_pos(args.state.player_ptr) - 640
+  args.state.sprite_y ||= FFI::MatoCore::player_y_pos(args.state.player_ptr) - 360
 
   args.state.sprite_x = (args.state.sprite_x * 0.8 + 0.2 * (FFI::MatoCore::player_x_pos(args.state.player_ptr) - 640)).to_i.clamp(0, WIDTH - 1280)
   args.state.sprite_y = (args.state.sprite_y * 0.8 + 0.2 * (FFI::MatoCore::player_y_pos(args.state.player_ptr) - 360)).to_i.clamp(0, HEIGHT - 720)
@@ -66,10 +65,10 @@ def tick in_args
   args.state.vert_move = 0 if args.state.vert_move.abs < 0.1 && args.inputs.up_down == 0
   args.state.horz_move = 0 if args.state.horz_move.abs < 0.1 && args.inputs.left_right == 0
 
-  if args.state.timer <= Time.now
-      FFI::MatoCore::player_input(args.state.player_ptr, args.state.vert_move.to_f, args.state.horz_move.to_f)
-      args.state.has_moved ||= args.inputs.up_down != 0 || args.inputs.left_right != 0
-      args.state.timer     = Time.now unless args.state.has_moved
+  if args.state.timer <= Kernel.tick_count
+    FFI::MatoCore::player_input(args.state.player_ptr, args.state.vert_move.to_f, args.state.horz_move.to_f)
+    args.state.has_moved ||= args.inputs.up_down != 0 || args.inputs.left_right != 0
+    args.state.timer     = Kernel.tick_count unless args.state.has_moved
   end
   FFI::MatoCore::player_tick(args.state.player_ptr)
 
@@ -97,15 +96,15 @@ def tick in_args
       args.state.sprite_y.to_i
   )
 
-  # npc_test(args)
+  npc_logic args
   FFI::MatoCore::screen_to_sprite("screen")
   args.outputs.primitives << [
       {x: 0, y: 0, w: 1280, h: 720, path: :screen}.sprite,
       [(args.state.player_x + Math.cos(mouse_angle) * mouse_dist) - 2, (args.state.player_y + Math.sin(mouse_angle) * mouse_dist) - 2, 4, 4, 200, 0, 0].solid,
-      [640, 60, Kernel.sprintf("%02.2f", (Time.now - args.state.timer).to_f), 10, 1].label,
+      [640, 60, Kernel.sprintf("%02.2f", (Kernel.tick_count - args.state.timer).fdiv(60).to_f), 10, 1].label,
   ]
-  if (Time.now - args.state.timer).to_f < 5 && args.outputs.static_labels.empty?
-    args.outputs.primitives << [640, 80.from_top, ">>> GO RIGHT >>>", 10, 1, 0, 0, 0, 255 - 255 * (Time.now - args.state.timer).to_f / 5].label
+  if (Kernel.tick_count - args.state.timer).fdiv(60).to_f < 5 && args.outputs.static_labels.empty?
+    args.outputs.primitives << [640, 80.from_top, ">>> GO RIGHT >>>", 10, 1, 0, 0, 0, 255 - 255 * (Kernel.tick_count - args.state.timer).fdiv(60).to_f / 5].label
   end
   args.outputs.debug << [
       [0, 40.from_top, 80, 40, 0, 0, 0, 255].solid,
@@ -115,15 +114,40 @@ def tick in_args
   ]
 
   if WIDTH - FFI::MatoCore::player_x_pos($args.state.player_ptr) < 32
-    str = "YOU WON IN " + Kernel.sprintf("%02.2f", (Time.now - args.state.timer).to_f) + " SECONDS!"
+    str = "YOU WON IN " + Kernel.sprintf("%02.2f", (Kernel.tick_count - args.state.timer).fdiv(60).to_f) + " SECONDS!"
     args.outputs.static_labels << [640, 80.from_top, str, 10, 1]
-    $gtk.schedule_callback(Kernel.tick_count + 120) { args.outputs.static_labels.clear }
+    $gtk.schedule_callback(Kernel.tick_count + 180) { args.outputs.static_labels.clear }
     FFI::MatoCore::despawn_player args.state.player_ptr
-    args.state.player_ptr = nil
-    args.state.timer = Time.now+3
+    args.state.player_ptr   = nil
+    args.state.npc_pointers ||= []
+    if ((40 - (Kernel.tick_count - args.state.timer).fdiv(30)).to_i.greater(0) + 1) > args.state.npc_pointers.size
+      args.state.npc_pointers.each do |npc_ptr|
+        FFI::MatoCore::despawn_player(npc_ptr)
+      end
+      args.state.npc_pointers = []
+      ((40 - (Kernel.tick_count - args.state.timer).fdiv(30)).to_i.greater(0) + 1).times do
+        add_npc args
+      end
+    end
+    args.state.timer = Kernel.tick_count + 3 * 60
   end
-
   args.outputs.background_color = [51, 48, 36]
+end
+
+def add_npc args
+  args.state.npc_pointers ||= []
+  args.state.npc_pointers << FFI::MatoCore::spawn_player((256 + 32 * args.state.npc_pointers.size).to_f, 100.0, Kernel.rand, Kernel.rand, Kernel.rand)
+end
+
+def npc_logic args
+  args.state.npc_pointers ||= []
+  args.state.npc_pointers.each_with_index do |npc_ptr, idx|
+    npc_movement_cycle_tick = args.state.tick_count + idx * 100 / args.state.npc_pointers.size
+    npc_vert_thrust         = (npc_movement_cycle_tick % 60 <=> 40).greater(0).to_f
+    FFI::MatoCore::player_input(npc_ptr, npc_vert_thrust, 0.0)
+    FFI::MatoCore::player_tick(npc_ptr)
+    FFI::MatoCore::draw_player(npc_ptr, args.state.sprite_x.to_i, args.state.sprite_y.to_i)
+  end
 end
 
 def npc_test args

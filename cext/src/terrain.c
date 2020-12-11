@@ -37,7 +37,6 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
-                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -55,7 +54,6 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
-                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -73,7 +71,6 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
-                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -91,7 +88,6 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
                 .tp_x = -1,
                 .tp_y = -1,
                 .parent = node,
-                .depth = node->depth + 1,
                 .childNW = NULL,
                 .childNE = NULL,
                 .childSW = NULL,
@@ -147,7 +143,6 @@ TerrainTreeNode *terrain_get_node_at(int x, int y) {
                             .tp_x = -1,
                             .tp_y = -1,
                             .parent = node,
-                            .depth = node->depth + 1,
                             .childNW = NULL,
                             .childNE = NULL,
                             .childSW = NULL,
@@ -170,7 +165,6 @@ TerrainTreeNode *terrain_get_node_at(int x, int y) {
                             .tp_x = -1,
                             .tp_y = -1,
                             .parent = node,
-                            .depth = node->depth + 1,
                             .childNW = NULL,
                             .childNE = NULL,
                             .childSW = NULL,
@@ -195,7 +189,6 @@ TerrainTreeNode *terrain_get_node_at(int x, int y) {
                             .tp_x = -1,
                             .tp_y = -1,
                             .parent = node,
-                            .depth = node->depth + 1,
                             .childNW = NULL,
                             .childNE = NULL,
                             .childSW = NULL,
@@ -218,7 +211,6 @@ TerrainTreeNode *terrain_get_node_at(int x, int y) {
                             .tp_x = -1,
                             .tp_y = -1,
                             .parent = node,
-                            .depth = node->depth + 1,
                             .childNW = NULL,
                             .childNE = NULL,
                             .childSW = NULL,
@@ -303,7 +295,7 @@ void terrain_refresh_quadtree(TerrainTreeNode *node) {
     }
 }
 
-static TerrainPixel terrain_generator_dirt(int x, int y, fnl_state noise, double depth) {
+static TerrainPixel terrain_generator_dirt(int x, int y, fnl_state noise) {
     double sx          = x;
     double sy          = y * 2;
     double sx_n        = sx / (TERRAIN_SIZE); // sx, normalized to [0..1]
@@ -320,15 +312,15 @@ static TerrainPixel terrain_generator_dirt(int x, int y, fnl_state noise, double
 ////  double threshold = pow(fabs(0.5 - sy_n) / sy_n, 2) * pow(sin(M_PI * sy_n), 3) * 2;
 ////  double threshold   = -2 * cos(2 * M_PI * (sy_n - 0.5));
 //    double threshold   = 1.95 + -36.3 * sy_n + 54.2 * sy_n2 + 1623 * sy_n3 + -11269 * sy_n4 + 31605 * sy_n5 + -44153 * sy_n6 + 30401 * sy_n7 + -8224 * sy_n8;
-    double threshold   = fabs(sy_n - 0.5) > 0.45 ? 2 : -0.5;
+    double threshold   = fabs(sy_n - 0.5) > 0.45 ? 2 : -0.6;
     double noise_shift = 0; // Positive => More common blobs. Negative => Less common blobs.
     threshold += noise_shift;
-    if (threshold <= -1 || fnlGetNoise3D(&noise, sx, sy, depth) > threshold) return TERRAIN_NONE;
+    if (threshold <= -1 || fnlGetNoise2D(&noise, sx, sy) > threshold) return TERRAIN_NONE;
     return TERRAIN_DIRT;
     return TERRAIN_SAND;
 }
 
-static TerrainPixel terrain_generator_sand(int x, int y, fnl_state noise, double depth) {
+static TerrainPixel terrain_generator_sand(int x, int y, fnl_state noise) {
     TerrainPixel initial_terrain = terrain_get_pixel(x, y, TERRAIN_NONE);
     if (initial_terrain.type == TERRAIN_NONE_TYPE || ((
             terrain_get_pixel(x - 1, y + 1, TERRAIN_NONE).type == TERRAIN_NONE_TYPE ||
@@ -355,14 +347,14 @@ static TerrainPixel terrain_generator_sand(int x, int y, fnl_state noise, double
 //    threshold = (threshold + 1) / 2;
 //    threshold *= 0.5;
 //    threshold = threshold * 2 - 1;
-    double threshold   = -0.75;
+    double threshold   = -0.875;
     double noise_shift = 0; // Positive => More common blobs. Negative => Less common blobs.
     threshold -= noise_shift;
-    if (threshold <= -1 || fnlGetNoise3D(&noise, sx, sy, depth) > threshold) return initial_terrain;
+    if (threshold <= -1 || fnlGetNoise2D(&noise, sx, sy) > threshold) return initial_terrain;
     return TERRAIN_SAND;
 }
 
-void terrain_generate(int base_seed, int smooth_seed) {
+void terrain_generate(int seed) {
     if (terrain_tree_root.childNW != NULL) {
         destroy_terrain_tree(&terrain_tree_root);
     }
@@ -377,7 +369,6 @@ void terrain_generate(int base_seed, int smooth_seed) {
             .tp_x = -1,
             .tp_y = -1,
             .parent = NULL,
-            .depth = 0,
             .childNW = NULL,
             .childNE = NULL,
             .childSW = NULL,
@@ -385,31 +376,31 @@ void terrain_generate(int base_seed, int smooth_seed) {
     };
 //    initialize_terrain_tree(&terrain_tree_root, 0);
     fnl_state dirt_noise = fnlCreateState();
-    dirt_noise.seed         = base_seed;
+    dirt_noise.seed         = seed;
     dirt_noise.noise_type   = FNL_NOISE_OPENSIMPLEX2;
     dirt_noise.gain         = 0.5f;
     dirt_noise.octaves      = 1;
-    dirt_noise.frequency    = 0.005f;
+    dirt_noise.frequency    = 0.0025f;
     dirt_noise.fractal_type = FNL_FRACTAL_NONE;
-    xor_srand(base_seed);
+    xor_srand(seed);
     int       sand_seed  = xor_rand_int32();
     fnl_state sand_noise = fnlCreateState();
     sand_noise.seed         = sand_seed;
     sand_noise.noise_type   = FNL_NOISE_OPENSIMPLEX2;
     sand_noise.gain         = 0.5f;
     sand_noise.octaves      = 1;
-    sand_noise.frequency    = 0.01f;
+    sand_noise.frequency    = 0.005f;
     sand_noise.fractal_type = FNL_FRACTAL_NONE;
 
     memset(TERRAIN, 0, TERRAIN_PIXELS * sizeof(byte));
     for (int y = 0; y < TERRAIN_SIZE; ++y) {
         for (int x = 0; x < TERRAIN_SIZE; ++x) {
-            TERRAIN[y * TERRAIN_SIZE + x] = terrain_generator_dirt(x, y, dirt_noise, smooth_seed);
+            TERRAIN[y * TERRAIN_SIZE + x] = terrain_generator_dirt(x, y, dirt_noise);
         }
     }
     for (int y = TERRAIN_SIZE - 1; y >= 0; --y) {
         for (int x = 0; x < TERRAIN_SIZE; ++x) {
-            TerrainPixel tp = terrain_generator_sand(x, y, sand_noise, smooth_seed);
+            TerrainPixel tp = terrain_generator_sand(x, y, sand_noise);
             if (tp.type == TERRAIN_SAND_TYPE) {
                 terrain_set_pixel(x, y, tp, true);
             } else {

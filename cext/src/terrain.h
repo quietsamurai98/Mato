@@ -1,7 +1,7 @@
 #ifndef CEXT_TERRAIN_H
 #define CEXT_TERRAIN_H
 
-void terrain_generate(int base_seed, int smooth_seed);
+void terrain_generate(int seed);
 
 void terrain_update();
 

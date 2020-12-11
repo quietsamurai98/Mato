@@ -63,8 +63,6 @@ typedef struct TerrainTreeNode {
     int tp_offset;
     int tp_x;
     int tp_y;
-
-    int depth;
     struct TerrainTreeNode *parent;
     struct TerrainTreeNode *childNW;
     struct TerrainTreeNode *childNE;

@@ -34,8 +34,8 @@ void matocore_draw_player(void *player, int x_0, int y_0) {
 }
 
 DRB_FFI_NAME(generate_terrain)
-void matocore_generate_terrain(int base_seed, int smooth_seed) {
-    terrain_generate(base_seed, smooth_seed);
+void matocore_generate_terrain(int base_seed) {
+    terrain_generate(base_seed);
 }
 
 DRB_FFI_NAME(update_terrain)
