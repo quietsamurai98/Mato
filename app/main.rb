@@ -125,7 +125,7 @@ def tick in_args
   FFI::MatoCore::screen_to_sprite("screen")
   args.outputs.primitives << [
       {x: 0, y: 0, w: 1280, h: 720, path: :screen}.sprite,
-      [(args.state.player_x + Math.cos(mouse_angle) * mouse_dist) - 2, (args.state.player_y + Math.sin(mouse_angle) * mouse_dist) - 2, 4, 4, 200, 0, 0].solid,
+      [(args.state.player_x + Math.cos(mouse_angle) * mouse_dist) - 2, (args.state.player_y + Math.sin(mouse_angle) * mouse_dist) - 2, 4, 4, 200, 0, 0, $devtools_enabled ? 255 : 0].solid,
       [640, 60, Kernel.sprintf("%02.2f", (Kernel.tick_count - args.state.timer).fdiv(60).to_f), 10, 1].label,
   ]
   if (Kernel.tick_count - args.state.timer).fdiv(60).to_f < 5 && args.outputs.static_labels.empty?
@@ -186,7 +186,7 @@ end
 
 def npc_logic args
   args.state.npc_pointers.each_with_index do |npc_ptr, idx|
-    npc_movement_cycle_tick = args.state.tick_count + idx * 100 / args.state.npc_pointers.size
+    npc_movement_cycle_tick = args.state.tick_count + idx * 120 / args.state.npc_pointers.size
     npc_vert_thrust         = (npc_movement_cycle_tick % 60 <=> 40).greater(0).to_f
     FFI::MatoCore::player_input(npc_ptr, npc_vert_thrust, 0.0)
     FFI::MatoCore::player_tick(npc_ptr)
@@ -194,21 +194,22 @@ def npc_logic args
   end
 end
 
-def npc_test args
-  args.state.npc_pointers ||= [
-      FFI::MatoCore::spawn_player((WIDTH / 2).to_f + 40.0 * 5.0, (HEIGHT / 2).to_f, 1.0, 0.3, 1.0),
-      FFI::MatoCore::spawn_player((WIDTH / 2).to_f + 40.0 * 4.0, (HEIGHT / 2).to_f, 0.3, 0.3, 1.0),
-      FFI::MatoCore::spawn_player((WIDTH / 2).to_f + 40.0 * 3.0, (HEIGHT / 2).to_f, 0.3, 0.9, 0.3),
-      FFI::MatoCore::spawn_player((WIDTH / 2).to_f + 40.0 * 2.0, (HEIGHT / 2).to_f, 0.9, 0.9, 0.0),
-      FFI::MatoCore::spawn_player((WIDTH / 2).to_f + 40.0 * 1.0, (HEIGHT / 2).to_f, 1.0, 0.5, 0.0),
-  ]
-  args.state.npc_pointers.each_with_index do |npc_ptr, idx|
-    npc_movement_cycle_tick = args.state.tick_count + idx * 100 / args.state.npc_pointers.size
-    npc_vert_thrust         = (npc_movement_cycle_tick % 120 <=> 90).greater(0).to_f
-    FFI::MatoCore::player_input(npc_ptr, npc_vert_thrust, 0.0)
-    FFI::MatoCore::player_tick(npc_ptr)
-    FFI::MatoCore::draw_player(npc_ptr, args.state.sprite_x.to_i, args.state.sprite_y.to_i)
+def npc_test n = 10
+  args = $args
+  args.state.npc_pointers.each do |ptr|
+    FFI::MatoCore::despawn_player ptr
   end
+  args.state.npc_pointers = n.times.map do |i|
+    FFI::MatoCore::spawn_player(50.0+(i*(WIDTH-100)/n).to_f, 100.0, Kernel.rand, Kernel.rand, Kernel.rand)
+  end
+  nil
+  # args.state.npc_pointers.each_with_index do |npc_ptr, idx|
+  #   npc_movement_cycle_tick = args.state.tick_count + idx * 100 / args.state.npc_pointers.size
+  #   npc_vert_thrust         = (npc_movement_cycle_tick % 120 <=> 90).greater(0).to_f
+  #   FFI::MatoCore::player_input(npc_ptr, npc_vert_thrust, 0.0)
+  #   FFI::MatoCore::player_tick(npc_ptr)
+  #   FFI::MatoCore::draw_player(npc_ptr, args.state.sprite_x.to_i, args.state.sprite_y.to_i)
+  # end
 end
 
 
@@ -252,7 +253,7 @@ def setseed new_seed = nil
       return "Pick a lower seed please ._."
     elsif new_seed == 0xFFFFFFFF
       puts "Very funny... -.-"
-      new_seed = 68 # Generates the player stuck underground 57 67
+      new_seed = 68 # Generates the player stuck underground
     end
     $args.state.map_seed = new_seed
     $gtk.console.hide

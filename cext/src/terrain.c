@@ -19,9 +19,9 @@ void initialize_terrain_tree(TerrainTreeNode *node, int depth) {
         y |= p->metadata.parent_on_top << i;
         p = p->parent;
     }
-    node->tp_offset              = (int) (y * TERRAIN_SIZE + x);
-    node->tp_x                   = (int) x;
-    node->tp_y                   = (int) y;
+    node->tp_offset = (int) (y * TERRAIN_SIZE + x);
+    node->tp_x      = (int) x;
+    node->tp_y      = (int) y;
     if (depth == TERRAIN_SPAN) {
         node->metadata.terminal_node = true;
     } else {
@@ -239,12 +239,14 @@ void terrain_set_pixel(int x, int y, TerrainPixel terrain_pixel, bool should_upd
     if (x < 0 || y < 0 || x >= TERRAIN_SIZE || y >= TERRAIN_SIZE) return;
     TERRAIN[y * TERRAIN_SIZE + x] = terrain_pixel;
     if (should_update)
-        for (int tx               = x - 1; tx <= x + 1; ++tx) {
+
+        for (int tx = x - 1; tx <= x + 1; ++tx) {
             for (int ty = y - 1; ty <= y + 1; ++ty) {
-                TerrainTreeNode *node = terrain_get_node_at(tx, ty);
-                if (node != NULL) {
-                    TerrainPixel *tp = &TERRAIN[node->tp_offset];
-                    if (tp->type != TERRAIN_NONE_TYPE && tp->type != TERRAIN_DIRT_TYPE) {
+                if (tx < 0 || ty < 0 || tx >= TERRAIN_SIZE || ty >= TERRAIN_SIZE) continue;
+                TerrainPixel *tp = &TERRAIN[ty * TERRAIN_SIZE + tx];
+                if (tp->type != TERRAIN_NONE_TYPE && tp->type != TERRAIN_DIRT_TYPE) {
+                    TerrainTreeNode *node = terrain_get_node_at(tx, ty);
+                    if (node != NULL) {
                         tp->needs_update |= should_update;
                         node->metadata.need_updating = tp->needs_update;
                         node = node->parent;
@@ -636,15 +638,15 @@ void terrain_update_quadtree_bottom_up(TerrainTreeNode *node) {
             update_xhst_at(node->tp_x, node->tp_y);
         } else {
             if (xor_rand_double() < 0.5) {
-                terrain_update_quadtree_bottom_up(node->childSW);
-                terrain_update_quadtree_bottom_up(node->childSE);
                 terrain_update_quadtree_bottom_up(node->childNW);
                 terrain_update_quadtree_bottom_up(node->childNE);
+                terrain_update_quadtree_bottom_up(node->childSW);
+                terrain_update_quadtree_bottom_up(node->childSE);
             } else {
-                terrain_update_quadtree_bottom_up(node->childSE);
-                terrain_update_quadtree_bottom_up(node->childSW);
                 terrain_update_quadtree_bottom_up(node->childNE);
                 terrain_update_quadtree_bottom_up(node->childNW);
+                terrain_update_quadtree_bottom_up(node->childSE);
+                terrain_update_quadtree_bottom_up(node->childSW);
             }
         }
     }
@@ -657,15 +659,15 @@ void terrain_update_quadtree_top_down(TerrainTreeNode *node) {
             update_smke_at(node->tp_x, node->tp_y);
         } else {
             if (xor_rand_double() < 0.5) {
-                terrain_update_quadtree_top_down(node->childNW);
-                terrain_update_quadtree_top_down(node->childNE);
                 terrain_update_quadtree_top_down(node->childSW);
                 terrain_update_quadtree_top_down(node->childSE);
+                terrain_update_quadtree_top_down(node->childNW);
+                terrain_update_quadtree_top_down(node->childNE);
             } else {
-                terrain_update_quadtree_top_down(node->childNE);
-                terrain_update_quadtree_top_down(node->childNW);
                 terrain_update_quadtree_top_down(node->childSE);
                 terrain_update_quadtree_top_down(node->childSW);
+                terrain_update_quadtree_top_down(node->childNE);
+                terrain_update_quadtree_top_down(node->childNW);
             }
         }
     }
