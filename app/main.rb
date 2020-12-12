@@ -1,4 +1,4 @@
-$gtk.ffi_misc.gtk_dlopen("ext")
+$gtk.ffi_misc.gtk_dlopen("matocore")
 
 WIDTH  = FFI::MatoCore::terrain_size * FFI::MatoCore::get_zoom
 HEIGHT = FFI::MatoCore::terrain_size * FFI::MatoCore::get_zoom
@@ -18,23 +18,48 @@ class GTK::Inputs
   end
 end
 
+$devtools_enabled ||= false
+$brush_material   ||= nil
 
 # @param args [GTK::Args]
 def tick in_args
-  args                      = in_args || $args
-  args.state.map_seed       ||= 6
-  args.state.brush_material ||= "NONE"
-  args.state.vert_move      ||= 0
-  args.state.horz_move      ||= 0
-  args.state.do_terrain_gen ||= false
-  args.state.timer          ||= Kernel.tick_count
+  args                          = in_args || $args
+  args.outputs.background_color = [51, 48, 36]
+  args.state.map_seed           ||= 6
+  args.state.vert_move          ||= 0
+  args.state.horz_move          ||= 0
+  args.state.do_terrain_gen     ||= false
+  args.state.timer              ||= Kernel.tick_count
+  args.state.npc_pointers       ||= []
   if args.state.do_terrain_gen
     FFI::MatoCore::generate_terrain(args.state.map_seed.to_i)
-    args.state.map_seed       += 1
+    if args.state.player_ptr
+      FFI::MatoCore::player_surface_warp(args.state.player_ptr)
+    end
+    args.state.npc_pointers.each { |npc_ptr| FFI::MatoCore::player_surface_warp(npc_ptr) }
     args.state.do_terrain_gen = false
   end
-  if Kernel.tick_count == 0 || args.inputs.keyboard.t || in_args == false
-    args.outputs.labels << [640, 370, "LOADING", 10, 1]
+  if Kernel.tick_count == 0 || args.inputs.keyboard.key_down.t || in_args == false
+    args.outputs.background_color = [113, 78, 28]
+    if Kernel.tick_count == 0
+      puts "Welcome to the developer console!"
+      puts "  Development commands include:"
+      puts "    toggle_devtools"
+      puts "    getseed"
+      puts "    setseed"
+      puts "    brushtype"
+    end
+    tips = loading_tips
+    args.outputs.labels << [
+        [640, 480, "GENERATING LEVEL", 10, 1],
+        [640, 435, "~~~~Controls~~~~", 8, 1],
+        [500, 400 - 30 * 0, "Move right  : →/D        ", 3, 0],
+        [500, 400 - 30 * 1, "Move left   : ←/A        ", 3, 0],
+        [500, 400 - 30 * 2, "Fly upwards : ↑/W/Space  ", 3, 0],
+        [500, 400 - 30 * 3, "Reset player: R          ", 3, 0],
+        [500, 400 - 30 * 4, "Reload level: T          ", 3, 0],
+        [640, 400 - 30 * 6, tips.sample, 2, 1],
+    ]
     args.state.do_terrain_gen = true
     return
   else
@@ -83,8 +108,8 @@ def tick in_args
       (args.state.player_x + Math.cos(mouse_angle) * mouse_dist + args.state.sprite_x).to_i,
       (args.state.player_y + Math.sin(mouse_angle) * mouse_dist + args.state.sprite_y).to_i,
       10
-  ) if args.inputs.mouse.button_right && Kernel.tick_count % 30 == 0
-  FFI::MatoCore::create_terrain((args.inputs.mouse.x + args.state.sprite_x).to_i, (args.inputs.mouse.y + args.state.sprite_y).to_i, 10, args.state.brush_material) if args.inputs.mouse.button_left # && args.inputs.mouse.down
+  ) if args.inputs.mouse.button_right && $devtools_enabled
+  FFI::MatoCore::create_terrain((args.inputs.mouse.x + args.state.sprite_x).to_i, (args.inputs.mouse.y + args.state.sprite_y).to_i, 10, $brush_material) if args.inputs.mouse.button_left && $brush_material
 
   FFI::MatoCore::draw_terrain(
       args.state.sprite_x.to_i,
@@ -106,41 +131,60 @@ def tick in_args
   if (Kernel.tick_count - args.state.timer).fdiv(60).to_f < 5 && args.outputs.static_labels.empty?
     args.outputs.primitives << [640, 80.from_top, ">>> GO RIGHT >>>", 10, 1, 0, 0, 0, 255 - 255 * (Kernel.tick_count - args.state.timer).fdiv(60).to_f / 5].label
   end
-  args.outputs.debug << [
-      [0, 40.from_top, 80, 40, 0, 0, 0, 255].solid,
-      {x: 10, y: 10.from_top, text: "#{($gtk.current_framerate + 0.5).to_i} FPS", r: 255, g: 255, b: 255}.label,
-  # [args.state.player_x + Math.cos(mouse_angle)*mouse_dist-20, args.state.player_y + Math.sin(mouse_angle)*mouse_dist-20, 40,40].border,
-  # [args.state.player_x-8, args.state.player_y-16, 16,32].border,
-  ]
+  # args.outputs.debug << [
+  #     [0, 40.from_top, 80, 40, 0, 0, 0, 255].solid,
+  #     {x: 10, y: 10.from_top, text: "#{($gtk.current_framerate + 0.5).to_i} FPS", r: 255, g: 255, b: 255}.label,
+  # # [args.state.player_x + Math.cos(mouse_angle)*mouse_dist-20, args.state.player_y + Math.sin(mouse_angle)*mouse_dist-20, 40,40].border,
+  # # [args.state.player_x-8, args.state.player_y-16, 16,32].border,
+  # ]
 
   if WIDTH - FFI::MatoCore::player_x_pos($args.state.player_ptr) < 32
     str = "YOU WON IN " + Kernel.sprintf("%02.2f", (Kernel.tick_count - args.state.timer).fdiv(60).to_f) + " SECONDS!"
     args.outputs.static_labels << [640, 80.from_top, str, 10, 1]
     $gtk.schedule_callback(Kernel.tick_count + 180) { args.outputs.static_labels.clear }
     FFI::MatoCore::despawn_player args.state.player_ptr
-    args.state.player_ptr   = nil
-    args.state.npc_pointers ||= []
+    args.state.player_ptr = nil
     if ((40 - (Kernel.tick_count - args.state.timer).fdiv(30)).to_i.greater(0) + 1) > args.state.npc_pointers.size
-      args.state.npc_pointers.each do |npc_ptr|
-        FFI::MatoCore::despawn_player(npc_ptr)
-      end
-      args.state.npc_pointers = []
-      ((40 - (Kernel.tick_count - args.state.timer).fdiv(30)).to_i.greater(0) + 1).times do
+      ((40 - (Kernel.tick_count - args.state.timer).fdiv(30)).to_i.greater(0) + 1 - args.state.npc_pointers.size).times do
         add_npc args
       end
     end
     args.state.timer = Kernel.tick_count + 3 * 60
   end
-  args.outputs.background_color = [51, 48, 36]
+end
+
+def loading_tips
+  return ["Goal: Get to the right side of the level. Par is 20 seconds."] if Kernel.global_tick_count == 0
+  tips = []
+  tips += ["Tip: There's no limit on your vertical speed, aside from hitting the ceiling."] * 4
+  tips += ["Tip: Touching the floor dramatically slows you down, but touching the ceiling does not."] * 3
+  tips += ["Tip: The level is very tall. Try flying higher if you can't find a good route closer to the ground."] * 2
+  tips += ["Tip: Your jetpack gets less effective at horizontal boosting at high horizontal speeds."] * 2
+  tips += ["Tip: You can slide off of sloped ceilings without a speed penalty."]
+  tips += ["Tip: If you get stuck in terrain, press R to reset."]
+
+  if Math.rand < 0.1
+    # Rare loading "tips" that aren't really tips, but are neat to know.
+    tips = [
+        "Secret: Try pressing the key below ESC (~ on US keyboards)",
+        "Trivia: Mato is Finnish for \"worm\".",
+        "Trivia: Mato was originally created after the developer found Liero's controls too unintuitive.",
+        "Trivia: Mato was inspired by games like Liero, Noita, and The Powder Toy.",
+    ]
+    if Math.rand < 0.1
+      # Super rare loading """tip"""
+      tips = ["PROTIP: To defeat the Cyberworm, shoot at it until it dies."]
+    end
+  end
+
+  tips
 end
 
 def add_npc args
-  args.state.npc_pointers ||= []
   args.state.npc_pointers << FFI::MatoCore::spawn_player((256 + 32 * args.state.npc_pointers.size).to_f, 100.0, Kernel.rand, Kernel.rand, Kernel.rand)
 end
 
 def npc_logic args
-  args.state.npc_pointers ||= []
   args.state.npc_pointers.each_with_index do |npc_ptr, idx|
     npc_movement_cycle_tick = args.state.tick_count + idx * 100 / args.state.npc_pointers.size
     npc_vert_thrust         = (npc_movement_cycle_tick % 60 <=> 40).greater(0).to_f
@@ -175,24 +219,51 @@ GTK::Console.const_set("DIRT", "DIRT")
 GTK::Console.const_set("NONE", "NONE")
 
 def brushtype material = ""
-  old                        = $args.state.brush_material
-  $args.state.brush_material = material
+  old             = $brush_material
+  $brush_material = material == "NONE" ? nil : material
   if material == "XHST"
-    "Terrain brush set to exhaust (XHST)"
+    "Terrain brush set to exhaust (XHST)\nHold the left mouse button to paint the selected material."
   elsif material == "SMKE"
-    "Terrain brush set to smoke (SMKE)"
+    "Terrain brush set to smoke (SMKE)\nHold the left mouse button to paint the selected material."
   elsif material == "DIRT"
-    "Terrain brush set to dirt (DIRT)"
+    "Terrain brush set to dirt (DIRT)\nHold the left mouse button to paint the selected material."
   elsif material == "SAND"
-    "Terrain brush set to sand (SAND)"
+    "Terrain brush set to sand (SAND)\nHold the left mouse button to paint the selected material."
   elsif material == "NONE"
     "Terrain brush disabled"
   else
     $args.state.brush_material = old
-    "USAGE: brushtype [MATERIAL]\n     Valid materials: XHST, SMKE, DIRT, SAND, NONE"
+    "USAGE: brushtype [MATERIAL]\n     Valid materials: XHST, SMKE, DIRT, SAND, NONE\nEXAMPLE: brushtype SAND"
   end
 end
 
-def spawn_player
-  FFI::MatoCore::spawn_player((Kernel.rand * (1280 - 32)).to_f, 360.to_f, Kernel.rand.to_f, Kernel.rand.to_f, Kernel.rand.to_f)
+def toggle_devtools
+  $devtools_enabled = !$devtools_enabled
+  if $devtools_enabled
+    "Terrain carving ENABLED. Hold right click to dig, press T to reset the level."
+  else
+    "Terrain carving DISABLED."
+  end
+end
+
+def setseed new_seed = nil
+  if new_seed && new_seed.to_i == new_seed && new_seed >= 0
+    if new_seed > 0xFFFFFFFF
+      return "Pick a lower seed please ._."
+    elsif new_seed == 0xFFFFFFFF
+      puts "Very funny... -.-"
+      new_seed = 68 # Generates the player stuck underground 57 67
+    end
+    $args.state.map_seed = new_seed
+    $gtk.console.hide
+    $gtk.schedule_callback(Kernel.tick_count + 33) {$args.inputs.keyboard.key_down.t = true}
+    "Map seed set to #{new_seed}."
+  else
+    "USAGE: setseed [LEVEL_SEED]\n     NOTE: Level seed must be a positive integer.\n     EXAMPLE: setseed 6"
+  end
+end
+
+def getseed
+  puts "Current map seed:"
+  $args.state.map_seed
 end
